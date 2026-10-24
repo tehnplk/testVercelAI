@@ -552,6 +552,105 @@ body {
   color: #ff6b6b;
 }
 
+/* .docx viewer: a dark frame around docx-preview's white pages; only its body scrolls. */
+.docx-viewer {
+  width: calc(100vw - 32px);
+  max-width: 960px;
+  height: calc(100vh - 32px);
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ev-c-gray-2);
+  border-radius: 10px;
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+.docx-viewer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.docx-viewer::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.docx-viewer-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--ev-c-gray-3);
+}
+
+.docx-viewer-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.docx-viewer-header button {
+  padding: 6px 18px;
+  border: 1px solid var(--ev-c-gray-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.docx-viewer-header .docx-viewer-close {
+  padding: 2px 10px;
+  border-color: transparent;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.docx-viewer-header button:hover {
+  background: var(--color-background-mute);
+}
+
+.docx-viewer-header button:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: -2px;
+}
+
+/* line-height: normal undoes the app's 1.6, which a document without its own spacing would inherit. */
+.docx-viewer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--color-background);
+  line-height: normal;
+}
+
+.docx-viewer-status {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--ev-c-text-2);
+  line-height: 1.6;
+}
+
+.docx-viewer-status.error {
+  color: #ff6b6b;
+}
+
+/* docx-preview's wrapper, with the app's background and less padding so an A4 page fits a 900px window. */
+.docx-viewer .docx-wrapper {
+  padding: 16px 16px 0;
+  background: var(--color-background);
+}
+
+.docx-viewer .docx-wrapper > section.docx {
+  margin-bottom: 16px;
+}
+
 .composer {
   display: flex;
   gap: 8px;

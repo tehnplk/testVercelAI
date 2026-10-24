@@ -44,6 +44,8 @@ declare global {
       approve: (id: string, ok: boolean) => void
       /** Resolves to '' on success, otherwise an error message. */
       openPath: (path: string) => Promise<string>
+      /** Bytes of a .docx file, or an error message when it is missing or over 50 MB. Rejects other paths. */
+      readDocx: (path: string) => Promise<Uint8Array | string>
       /** Full paths chosen in the file dialog; empty when canceled. */
       pickFiles: () => Promise<string[]>
       onJev: (cb: (update: { id: string; status: JevStatus }) => void) => () => void

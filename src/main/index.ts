@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { readFile, realpath, stat } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { isStepCount, streamText } from 'ai'
@@ -103,6 +104,19 @@ app.whenReady().then(() => {
       return ''
     }
     return shell.openPath(path)
+  })
+
+  // Bytes of a .docx file for the in-app viewer, or an error message. Nothing but .docx files is read here.
+  const docx = /\.docx$/i
+  ipcMain.handle('file:read-docx', async (_, path: unknown) => {
+    if (typeof path !== 'string' || !docx.test(path)) throw new Error('Invalid path')
+    // The real path must be a .docx too, so a link named .docx cannot hand out another file.
+    const real = await realpath(path).catch(() => '')
+    const info = real && (await stat(real))
+    if (!info || !info.isFile()) return `ไม่พบไฟล์: ${path}`
+    if (!docx.test(real)) throw new Error('Invalid path')
+    if (info.size > 50 * 1024 * 1024) return `ไฟล์ใหญ่เกิน 50 MB จึงเปิดดูในแอปไม่ได้: ${path}`
+    return readFile(real)
   })
 
   // Full paths of the files the user picks to attach; empty when canceled.

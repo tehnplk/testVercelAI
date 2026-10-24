@@ -1,7 +1,11 @@
+import { createContext, useContext } from 'react'
 import type { ExtraProps } from 'react-markdown'
 
 // Prefix of a link's href that FileLink opens as a local file.
 export const OPEN = '#open:'
+
+// Shows a .docx file in App's DocxViewer.
+export const ViewDocx = createContext<(path: string) => void>(() => {})
 
 // ponytail: regex path detection; a path followed by more text with another ".ext" can over-match.
 const pathRe = /[A-Za-z]:[\\/](?:[^\\/:*?"<>|\r\n`]+[\\/])*[^\\/:*?"<>|\r\n`]+\.[A-Za-z0-9]{1,8}/g
@@ -22,7 +26,9 @@ export function linkifyPaths(markdown: string): string {
     .join('')
 }
 
+// A .docx file opens in the in-app viewer; any other file opens in its default app.
 function FileLink({ node: _node, href, children, ...props }: React.ComponentProps<'a'> & ExtraProps): React.JSX.Element {
+  const viewDocx = useContext(ViewDocx)
   if (!href?.startsWith(OPEN))
     return (
       <a href={href} target="_blank" rel="noreferrer" {...props}>
@@ -32,6 +38,7 @@ function FileLink({ node: _node, href, children, ...props }: React.ComponentProp
   const path = decodeURIComponent(href.slice(OPEN.length))
   const open = async (e: React.MouseEvent): Promise<void> => {
     e.preventDefault()
+    if (/\.docx$/i.test(path)) return viewDocx(path)
     const error = await window.api.openPath(path)
     if (error) alert(error)
   }

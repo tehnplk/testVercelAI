@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
-import FileLink, { linkifyPaths, OPEN } from './components/FileLink'
+import DocxViewer from './components/DocxViewer'
+import FileLink, { linkifyPaths, OPEN, ViewDocx } from './components/FileLink'
 import Sidebar, { displayTitle } from './components/Sidebar'
 
 const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
@@ -157,6 +158,9 @@ function App(): React.JSX.Element {
   // Answer text streamed so far; the reload from history replaces it when the reply ends.
   const [streamed, setStreamed] = useState('')
   const [approval, setApproval] = useState<ApprovalRequest | null>(null)
+  // Path of the .docx file open in the viewer. Kept here, so the viewer stays open when the reply
+  // whose link opened it is replaced by its stored copy.
+  const [docx, setDocx] = useState<string | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const opening = useRef<number | null>(null)
@@ -266,123 +270,126 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <div className="app">
-      <Sidebar
-        sessions={sessions}
-        sessionId={sessionId}
-        disabled={pending}
-        onOpen={openSession}
-        onDelete={deleteSession}
-        onRename={renameSession}
-        onPin={pinSession}
-      />
-      <div className="chat">
-        <ChatHeader session={sessions.find((s) => s.id === sessionId)} />
-        <main className="messages">
-          {messages.map((m, i) => (
-            <div key={i} className={`msg ${m.role}`}>
-              {m.role === 'assistant' ? (
-                <>
-                  {m.turn && <TurnInfo turn={m.turn} />}
-                  <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
-                    {linkifyPaths(m.content)}
-                  </Markdown>
-                </>
-              ) : (
-                <UserMessage content={m.content} />
-              )}
-            </div>
-          ))}
-          {pending && (
-            <div className="msg assistant pending">
-              {toolLog.map((t) => (
-                <div key={t.id}>
-                  <div className={t.running ? 'tool-line running' : 'tool-line'}>
-                    {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
-                  </div>
-                  {jev[t.id] && (
-                    <div className={`jev-line jev-${jev[t.id]}`}>
-                      Guard : {JEV_TEXT[jev[t.id]]}
+    <ViewDocx.Provider value={setDocx}>
+      <div className="app">
+        <Sidebar
+          sessions={sessions}
+          sessionId={sessionId}
+          disabled={pending}
+          onOpen={openSession}
+          onDelete={deleteSession}
+          onRename={renameSession}
+          onPin={pinSession}
+        />
+        <div className="chat">
+          <ChatHeader session={sessions.find((s) => s.id === sessionId)} />
+          <main className="messages">
+            {messages.map((m, i) => (
+              <div key={i} className={`msg ${m.role}`}>
+                {m.role === 'assistant' ? (
+                  <>
+                    {m.turn && <TurnInfo turn={m.turn} />}
+                    <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                      {linkifyPaths(m.content)}
+                    </Markdown>
+                  </>
+                ) : (
+                  <UserMessage content={m.content} />
+                )}
+              </div>
+            ))}
+            {pending && (
+              <div className="msg assistant pending">
+                {toolLog.map((t) => (
+                  <div key={t.id}>
+                    <div className={t.running ? 'tool-line running' : 'tool-line'}>
+                      {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
                     </div>
-                  )}
-                  {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}
-                </div>
-              ))}
-              {streamed && (
-                <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
-                  {linkifyPaths(streamed)}
-                </Markdown>
-              )}
-              <div>
-                {toolLog.some((t) => t.running)
-                  ? `กำลังเรียก tool: ${toolLog.filter((t) => t.running).map((t) => t.name).join(', ')}…`
-                  : 'กำลังคิด…'}
-              </div>
-            </div>
-          )}
-          {approval && (
-            <div className="approval">
-              <div className="approval-title">Agent ขออนุญาตรัน {approval.tool}</div>
-              <div className="risk">🔴 Guard ประเมินว่า risk: {approval.risk.reason}</div>
-              <pre>{approval.detail}</pre>
-              <div className="approval-actions">
-                <button className="run" onClick={() => answer(true)}>
-                  รัน
-                </button>
-                <button onClick={() => answer(false)}>ยกเลิก</button>
-              </div>
-            </div>
-          )}
-          {error && <div className="error">{error}</div>}
-          <div ref={bottom} />
-        </main>
-        <form className="composer" onSubmit={send}>
-          <div className="composer-box">
-            {attachments.length > 0 && (
-              <div className="file-chips">
-                {attachments.map((p) => (
-                  <FileChip
-                    key={p}
-                    path={p}
-                    disabled={pending}
-                    onRemove={() => setAttachments((a) => a.filter((x) => x !== p))}
-                  />
+                    {jev[t.id] && (
+                      <div className={`jev-line jev-${jev[t.id]}`}>
+                        Guard : {JEV_TEXT[jev[t.id]]}
+                      </div>
+                    )}
+                    {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}
+                  </div>
                 ))}
+                {streamed && (
+                  <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                    {linkifyPaths(streamed)}
+                  </Markdown>
+                )}
+                <div>
+                  {toolLog.some((t) => t.running)
+                    ? `กำลังเรียก tool: ${toolLog.filter((t) => t.running).map((t) => t.name).join(', ')}…`
+                    : 'กำลังคิด…'}
+                </div>
               </div>
             )}
-            <div className="composer-row">
-              <button
-                type="button"
-                className="attach"
-                aria-label="แนบไฟล์"
-                title="แนบไฟล์"
-                disabled={pending}
-                onClick={attach}
-              >
-                +
-              </button>
-              <textarea
-                ref={textarea}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault()
-                    e.currentTarget.form?.requestSubmit()
-                  }
-                }}
-                placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
-                rows={1}
-                autoFocus
-              />
+            {approval && (
+              <div className="approval">
+                <div className="approval-title">Agent ขออนุญาตรัน {approval.tool}</div>
+                <div className="risk">🔴 Guard ประเมินว่า risk: {approval.risk.reason}</div>
+                <pre>{approval.detail}</pre>
+                <div className="approval-actions">
+                  <button className="run" onClick={() => answer(true)}>
+                    รัน
+                  </button>
+                  <button onClick={() => answer(false)}>ยกเลิก</button>
+                </div>
+              </div>
+            )}
+            {error && <div className="error">{error}</div>}
+            <div ref={bottom} />
+          </main>
+          <form className="composer" onSubmit={send}>
+            <div className="composer-box">
+              {attachments.length > 0 && (
+                <div className="file-chips">
+                  {attachments.map((p) => (
+                    <FileChip
+                      key={p}
+                      path={p}
+                      disabled={pending}
+                      onRemove={() => setAttachments((a) => a.filter((x) => x !== p))}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="composer-row">
+                <button
+                  type="button"
+                  className="attach"
+                  aria-label="แนบไฟล์"
+                  title="แนบไฟล์"
+                  disabled={pending}
+                  onClick={attach}
+                >
+                  +
+                </button>
+                <textarea
+                  ref={textarea}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      e.currentTarget.form?.requestSubmit()
+                    }
+                  }}
+                  placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
+                  rows={1}
+                  autoFocus
+                />
+              </div>
             </div>
-          </div>
-          <button type="submit" disabled={pending || !input.trim()}>
-            ส่ง
-          </button>
-        </form>
+            <button type="submit" disabled={pending || !input.trim()}>
+              ส่ง
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+      {docx && <DocxViewer path={docx} onClose={() => setDocx(null)} />}
+    </ViewDocx.Provider>
   )
 }
 
