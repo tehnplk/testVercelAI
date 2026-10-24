@@ -140,8 +140,35 @@ export async function loadModelMessages(sessionId: number): Promise<ModelMessage
     'SELECT role, content, message FROM messages WHERE session_id = $1 ORDER BY id',
     [sessionId]
   )
-  return rows.map((r) => r.message ?? ({ role: r.role, content: r.content } as ModelMessage))
+  return rows.map((r) => withoutImages(r.message ?? ({ role: r.role, content: r.content } as ModelMessage)))
 }
+
+// An image a tool result showed (viewImage) is sent to the model only in the turn that viewed it;
+// later turns get a note instead. The stored row keeps the image.
+const withoutImages = (m: ModelMessage): ModelMessage =>
+  m.role !== 'tool'
+    ? m
+    : {
+        ...m,
+        content: m.content.map((p) =>
+          p.type !== 'tool-result' || p.output.type !== 'content'
+            ? p
+            : {
+                ...p,
+                output: {
+                  ...p.output,
+                  value: p.output.value.map((v) =>
+                    v.type === 'text'
+                      ? v
+                      : {
+                          type: 'text' as const,
+                          text: `[ภาพ ${('filename' in v && v.filename) || ''} ถูกส่งให้ดูแล้วใน turn ก่อน หากต้องดูอีกให้เรียก viewImage ใหม่]`
+                        }
+                  )
+                }
+              }
+        )
+      }
 
 // Tool-call and tool-result parts as stored in the message JSON.
 type Part = {
@@ -174,6 +201,12 @@ const labeled = (stdout: string, label: string): string[] => [
 function shown(name: string, result: Part | undefined): Pick<ToolCall, 'output' | 'files' | 'console'> {
   const o = result?.output
   if (!o) return { output: '(no result)', files: [], console: '(no result)' }
+  // Text and image parts (viewImage): the text is the console, the image's file name the output; never the image data.
+  if (o.type === 'content' && Array.isArray(o.value)) {
+    const parts = o.value as { text?: string; filename?: string }[]
+    const text = parts.map((p) => p.text ?? '').filter(Boolean).join('\n')
+    return { output: parts.find((p) => p.filename)?.filename ?? lastLine(text), files: [], console: cap(text) }
+  }
   const text =
     typeof o.value === 'string'
       ? o.value

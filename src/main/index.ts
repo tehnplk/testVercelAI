@@ -9,6 +9,7 @@ import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
 import { assessRisk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
+import { imageTools } from './llm_image'
 import { randomUUID } from 'crypto'
 import {
   addUsage,
@@ -146,7 +147,8 @@ app.whenReady().then(() => {
         ...shellTools(approve, toolOutput, content, (u) =>
           countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens })
         ),
-        ...skillTools(skills)
+        ...skillTools(skills),
+        ...imageTools
       },
       stopWhen: isStepCount(20),
       messages,

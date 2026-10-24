@@ -10,6 +10,8 @@ The command or script itself must print its outcome as the last lines of its out
 - for every file it creates or changes: "Saved: <full Windows path>" (e.g. "Saved: C:\\Users\\me\\Desktop\\report.docx");
 - for what it reads or computes: its key value as "Result: <value>" (e.g. "Result: 105000", "Result: Example Domain"). When the user asks for a value (a total, a count, a heading, a status), make the script find or compute that value and print it this way, not only print the raw content.
 These lines belong in the command's output only; never write them in your reply.
+To look at an image file, call viewImage with its full Windows path.
+For a scanned PDF (pdfplumber gives no text), render its pages to PNG with Bash (pypdfium2 comes with pdfplumber), then viewImage each page.
 The user's Desktop is ${app.getPath('desktop')}; their Documents folder is ${app.getPath('documents')}.
 If a Python or Node.js package you need is missing, install it yourself: "py -m pip install --user <package>", or "npm install <package>" inside the folder where the script runs. The user is asked to approve every install.
 If Python ("py") or Node.js ("node") itself is not found, install it with winget:
