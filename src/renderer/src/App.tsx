@@ -3,7 +3,55 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
 import FileLink, { linkifyPaths } from './components/FileLink'
-import Sidebar from './components/Sidebar'
+import Sidebar, { displayTitle } from './components/Sidebar'
+
+const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
+
+// Title, start time and tokens of the open session; a chat not sent yet is just "แชตใหม่".
+function ChatHeader({ session }: { session?: Session }): React.JSX.Element {
+  if (!session)
+    return (
+      <header className="chat-header">
+        <span className="chat-title">แชตใหม่</span>
+      </header>
+    )
+  const created = new Date(session.createdAt)
+  const tracked = session.agentInputTokens !== null
+  const total =
+    (session.agentInputTokens ?? 0) +
+    (session.agentOutputTokens ?? 0) +
+    (session.jevInputTokens ?? 0) +
+    (session.jevOutputTokens ?? 0)
+  return (
+    <header className="chat-header">
+      <span className="chat-title" title={session.title}>
+        {displayTitle(session.title)}
+      </span>
+      <time className="chat-meta" dateTime={created.toISOString()}>
+        เริ่ม{' '}
+        {created.toLocaleString('th-TH', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23'
+        })}
+      </time>
+      <span
+        className="chat-meta"
+        title={
+          tracked
+            ? `Agent: in ${count(session.agentInputTokens)} / out ${count(session.agentOutputTokens)}\n` +
+              `Jev: in ${count(session.jevInputTokens)} / out ${count(session.jevOutputTokens)}`
+            : 'เริ่มนับ token หลังแชตนี้ จึงไม่มีตัวเลข'
+        }
+      >
+        รวม {tracked ? count(total) : '—'} tokens
+      </span>
+    </header>
+  )
+}
 
 function App(): React.JSX.Element {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -30,6 +78,12 @@ function App(): React.JSX.Element {
     if (opening.current === id) setMessages(history)
   }
 
+  const deleteSession = async (id: number): Promise<void> => {
+    await window.api.deleteSession(id)
+    setSessions((list) => list.filter((s) => s.id !== id))
+    if (id === sessionId) openSession(null)
+  }
+
   useEffect(() => {
     window.api.sessions().then((list) => {
       setSessions(list)
@@ -43,7 +97,17 @@ function App(): React.JSX.Element {
       setToolOutput((o) => ({ ...o, [id]: ((o[id] ?? '') + chunk).slice(-20000) }))
     )
     const offJev = window.api.onJev(({ id, status }) => setJev((j) => ({ ...j, [id]: status })))
+    // Live token totals during a reply. On a new chat the first update names the session it created,
+    // so the header shows it before the reply arrives.
+    const offUsage = window.api.onUsage(({ sessionId: id, ...usage }) => {
+      if (opening.current === null) {
+        opening.current = id
+        setSessionId(id)
+        window.api.sessions().then(setSessions)
+      } else setSessions((list) => list.map((s) => (s.id === id ? { ...s, ...usage } : s)))
+    })
     return () => {
+      offUsage()
       offTool()
       offApprove()
       offOutput()
@@ -87,8 +151,15 @@ function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Sidebar sessions={sessions} sessionId={sessionId} disabled={pending} onOpen={openSession} />
+      <Sidebar
+        sessions={sessions}
+        sessionId={sessionId}
+        disabled={pending}
+        onOpen={openSession}
+        onDelete={deleteSession}
+      />
       <div className="chat">
+        <ChatHeader session={sessions.find((s) => s.id === sessionId)} />
         <main className="messages">
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role}`}>

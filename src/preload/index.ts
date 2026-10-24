@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   sessions: () => ipcRenderer.invoke('sessions:list'),
+  deleteSession: (sessionId: number) => ipcRenderer.invoke('sessions:delete', sessionId),
   history: (sessionId: number) => ipcRenderer.invoke('chat:history', sessionId),
   send: (sessionId: number | null, content: string) => ipcRenderer.invoke('chat:send', sessionId, content),
   onTool: (cb: (event: { id: string; name: string; running: boolean }) => void) => {
@@ -22,6 +23,11 @@ const api = {
     const listener = (_: unknown, update: { id: string; status: 'inspecting' | 'safe' | 'risk' }): void => cb(update)
     ipcRenderer.on('chat:jev', listener)
     return () => ipcRenderer.off('chat:jev', listener)
+  },
+  onUsage: (cb: (usage: { sessionId: number }) => void) => {
+    const listener = (_: unknown, usage: { sessionId: number }): void => cb(usage)
+    ipcRenderer.on('chat:usage', listener)
+    return () => ipcRenderer.off('chat:usage', listener)
   },
   onToolOutput: (cb: (output: { id: string; chunk: string }) => void) => {
     const listener = (_: unknown, output: { id: string; chunk: string }): void => cb(output)

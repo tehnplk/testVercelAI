@@ -4,7 +4,19 @@ import { PGlite } from '@electric-sql/pglite'
 import type { ModelMessage } from 'ai'
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string }
-export type Session = { id: number; title: string }
+// Token counts are null for sessions from before token counting.
+export type Session = {
+  id: number
+  title: string
+  createdAt: Date
+  updatedAt: Date
+  agentInputTokens: number | null
+  agentOutputTokens: number | null
+  jevInputTokens: number | null
+  jevOutputTokens: number | null
+}
+export type TokenUsage = { agentInput: number; agentOutput: number; jevInput: number; jevOutput: number }
+export type SessionUsage = Pick<Session, 'agentInputTokens' | 'agentOutputTokens' | 'jevInputTokens' | 'jevOutputTokens'>
 
 const db = new PGlite(join(app.getPath('userData'), 'pgdata'))
 
@@ -24,6 +36,11 @@ async function migrate(): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now()
     );
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS session_id int REFERENCES sessions(id);
+    -- NULL: the session is older than token counting.
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_input_tokens int;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_output_tokens int;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jev_input_tokens int;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jev_output_tokens int;
   `)
   // Messages from before sessions existed go into one session.
   const orphans = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM messages WHERE session_id IS NULL')
@@ -49,15 +66,43 @@ export async function newSession(title: string): Promise<number> {
   return createSession(title)
 }
 
+// Newest first by last message time; an empty session counts from its creation.
 export async function listSessions(): Promise<Session[]> {
   await ready
   const { rows } = await db.query<Session>(`
-    SELECT s.id, s.title
+    SELECT s.id, s.title, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
+      s.agent_input_tokens AS "agentInputTokens", s.agent_output_tokens AS "agentOutputTokens",
+      s.jev_input_tokens AS "jevInputTokens", s.jev_output_tokens AS "jevOutputTokens"
     FROM sessions s LEFT JOIN messages m ON m.session_id = s.id
     GROUP BY s.id
-    ORDER BY max(m.id) DESC NULLS LAST, s.id DESC
+    ORDER BY "updatedAt" DESC, s.id DESC
   `)
   return rows
+}
+
+// Adds to the stored totals and returns them; the first count turns NULL (not counted) into a number.
+export async function addUsage(sessionId: number, u: Partial<TokenUsage>): Promise<SessionUsage> {
+  await ready
+  const { rows } = await db.query<SessionUsage>(
+    `UPDATE sessions SET
+       agent_input_tokens = coalesce(agent_input_tokens, 0) + $2,
+       agent_output_tokens = coalesce(agent_output_tokens, 0) + $3,
+       jev_input_tokens = coalesce(jev_input_tokens, 0) + $4,
+       jev_output_tokens = coalesce(jev_output_tokens, 0) + $5
+     WHERE id = $1
+     RETURNING agent_input_tokens AS "agentInputTokens", agent_output_tokens AS "agentOutputTokens",
+       jev_input_tokens AS "jevInputTokens", jev_output_tokens AS "jevOutputTokens"`,
+    [sessionId, u.agentInput ?? 0, u.agentOutput ?? 0, u.jevInput ?? 0, u.jevOutput ?? 0]
+  )
+  return rows[0]
+}
+
+export async function deleteSession(sessionId: number): Promise<void> {
+  await ready
+  await db.transaction(async (tx) => {
+    await tx.query('DELETE FROM messages WHERE session_id = $1', [sessionId])
+    await tx.query('DELETE FROM sessions WHERE id = $1', [sessionId])
+  })
 }
 
 // Full messages, tool calls and results included, so the model sees what it did in earlier turns.

@@ -8,8 +8,18 @@ import { model } from './llm_model'
 import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
 import { assessRisk } from './llm_risk'
+import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
 import { randomUUID } from 'crypto'
-import { listSessions, loadChat, loadModelMessages, newSession, saveMessages } from './llm_memory'
+import {
+  addUsage,
+  deleteSession,
+  listSessions,
+  loadChat,
+  loadModelMessages,
+  newSession,
+  saveMessages,
+  type TokenUsage
+} from './llm_memory'
 
 function createWindow(): void {
   // Create the browser window.
@@ -58,6 +68,10 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('sessions:list', () => listSessions())
+  ipcMain.handle('sessions:delete', (_, sessionId: unknown) => {
+    if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
+    return deleteSession(sessionId as number)
+  })
 
   // Files that would run when opened are shown in Explorer instead.
   const runnable = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|lnk|scr|hta|reg|jar|py|pyw|sh|cpl)$/i
@@ -85,6 +99,16 @@ app.whenReady().then(() => {
 
   // sessionId null starts a new session, titled by its first message.
   ipcMain.handle('chat:send', async (event, sessionId: unknown, content: unknown) => {
+    if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
+    if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
+    const id = sessionId ?? (await newSession(content.trim().slice(0, 60)))
+    await saveMessages(id, [{ role: 'user', content }])
+    // Stored after every agent step and Jev call, so a reply that fails halfway keeps what it spent,
+    // and the header follows live. A provider that reports no count adds 0.
+    const countUsage = async (u: Partial<TokenUsage>): Promise<void> =>
+      event.sender.send('chat:usage', { sessionId: id, ...(await addUsage(id, u)) })
+    // A new chat shows in the header at once, counting from 0.
+    if (sessionId === null) await countUsage({})
     const toolOutput = (toolCallId: string, chunk: string): void =>
       event.sender.send('chat:tool-output', { id: toolCallId, chunk })
     // Commands run so far for this message; Jev uses them to tell files this task made from the user's own.
@@ -92,7 +116,8 @@ app.whenReady().then(() => {
     // Jev judges the run first: SAFE runs at once, RISK shows the approval card.
     const approve = async (tool: string, detail: string, toolCallId: string): Promise<boolean> => {
       event.sender.send('chat:jev', { id: toolCallId, status: 'inspecting' })
-      const risk = await assessRisk(tool, detail, ran)
+      const { risk, usage } = await assessRisk(tool, detail, ran)
+      await countUsage({ jevInput: usage?.inputTokens, jevOutput: usage?.outputTokens })
       event.sender.send('chat:jev', { id: toolCallId, status: risk.level })
       const ok =
         risk.level === 'safe' ||
@@ -104,21 +129,21 @@ app.whenReady().then(() => {
       if (ok) ran.push(detail)
       return ok
     }
-    if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
-    if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
-    const id = sessionId ?? (await newSession(content.trim().slice(0, 60)))
-    await saveMessages(id, [{ role: 'user', content }])
     const messages = await loadModelMessages(id)
+    // Read on every message, so a skill folder added while the app runs is picked up.
+    const skills = discoverSkills()
     const { text, responseMessages } = await generateText({
       model,
-      system: systemPrompt,
-      tools: shellTools(approve, toolOutput),
+      system: systemPrompt + skillsPrompt(skills),
+      tools: { ...shellTools(approve, toolOutput), ...skillTools(skills) },
       stopWhen: isStepCount(20),
       messages,
       onToolExecutionStart: ({ toolCall }) =>
         event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true }),
       onToolExecutionEnd: ({ toolCall }) =>
-        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false })
+        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false }),
+      // Per step only; the all-steps total (result.usage) is not added again.
+      onStepEnd: ({ usage }) => countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
     })
     await saveMessages(id, responseMessages)
     return { sessionId: id, text }

@@ -7,7 +7,9 @@ The main agent takes the user's request and spawns the coding agent that fits it
 - **sr** (Opus, effort high): hard work - features across several files, design choices, unknown bugs, security-sensitive code.
 - **jr** (Sonnet, effort high): easy work - small UI/CSS/text changes, one-file changes with a clear spec, lookups.
 
-Brief the agent with the goal, the files and what is known. Review its result before reporting to the user. When unsure, use sr.
+Brief the agent with the goal, the files and what is known. When unsure, use sr.
+
+Accept an agent's work only after testing it yourself: read the diff, run `npm run build`, and repeat the key checks on the real app (see Build and run). The agent's own report is not acceptance. Report to the user what you tested and what failed.
 
 ## Project
 
