@@ -1,6 +1,7 @@
 import type { ExtraProps } from 'react-markdown'
 
-const OPEN = '#open:'
+// Prefix of a link's href that FileLink opens as a local file.
+export const OPEN = '#open:'
 
 // ponytail: regex path detection; a path followed by more text with another ".ext" can over-match.
 const pathRe = /[A-Za-z]:[\\/](?:[^\\/:*?"<>|\r\n`]+[\\/])*[^\\/:*?"<>|\r\n`]+\.[A-Za-z0-9]{1,8}/g

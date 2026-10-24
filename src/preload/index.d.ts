@@ -1,7 +1,13 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
 declare global {
-  type ChatMessage = { role: 'user' | 'assistant'; content: string }
+  // Same as ChatMessage in src/main/llm_memory.ts.
+  type ToolCall = { name: string; input: string; output: string; files: string[]; console: string }
+  type ChatMessage = {
+    role: 'user' | 'assistant'
+    content: string
+    turn?: { skills: string[]; tools: ToolCall[] }
+  }
   // Token counts are null for sessions from before token counting.
   type Session = {
     id: number
@@ -20,7 +26,7 @@ declare global {
   type Risk ={ level: 'safe' | 'risk'; reason: string }
   type JevStatus = 'inspecting' | Risk['level']
   type ApprovalRequest = { id: string; tool: string; detail: string; risk: Risk }
-  type ToolEvent = { id: string; name: string; running: boolean }
+  type ToolEvent = { id: string; name: string; running: boolean; skill?: string }
 
   interface Window {
     electron: ElectronAPI

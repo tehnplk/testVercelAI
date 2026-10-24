@@ -21,6 +21,12 @@ import {
   type TokenUsage
 } from './llm_memory'
 
+// Skill name the agent passed to loadSkill, for the tool log label.
+function skillName(toolCall: { toolName: string; input: unknown }): string | undefined {
+  const name = (toolCall.input as { name?: unknown } | null)?.name
+  return toolCall.toolName === 'loadSkill' && typeof name === 'string' ? name : undefined
+}
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -135,13 +141,19 @@ app.whenReady().then(() => {
     const { text, responseMessages } = await generateText({
       model,
       system: systemPrompt + skillsPrompt(skills),
-      tools: { ...shellTools(approve, toolOutput), ...skillTools(skills) },
+      tools: {
+        // The summary model's tokens count as the agent's.
+        ...shellTools(approve, toolOutput, content, (u) =>
+          countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens })
+        ),
+        ...skillTools(skills)
+      },
       stopWhen: isStepCount(20),
       messages,
       onToolExecutionStart: ({ toolCall }) =>
-        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true }),
+        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall) }),
       onToolExecutionEnd: ({ toolCall }) =>
-        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false }),
+        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false, skill: skillName(toolCall) }),
       // Per step only; the all-steps total (result.usage) is not added again.
       onStepEnd: ({ usage }) => countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
     })

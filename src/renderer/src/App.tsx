@@ -2,10 +2,54 @@ import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
-import FileLink, { linkifyPaths } from './components/FileLink'
+import FileLink, { linkifyPaths, OPEN } from './components/FileLink'
 import Sidebar, { displayTitle } from './components/Sidebar'
 
 const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
+
+const JEV_TEXT: Record<JevStatus, string> = {
+  inspecting: 'กำลังวิเคราะห์',
+  safe: 'ปลอดภัย',
+  risk: 'มีความเสี่ยง'
+}
+
+// Skills and tool calls of a turn, shown above its final answer.
+function TurnInfo({ turn }: { turn: NonNullable<ChatMessage['turn']> }): React.JSX.Element {
+  return (
+    <div className="turn">
+      {turn.skills.length > 0 && <div>Skill Use : {turn.skills.join(', ')}</div>}
+      {turn.tools.map((t, i) => (
+        <details key={i} className="turn-tool">
+          {/* One plain-text row with +/- at its right, so a click anywhere on it only toggles. */}
+          <summary>
+            <span className="turn-input" title={t.input}>
+              {t.name} : {t.input}
+            </span>
+          </summary>
+          <div>
+            output : {t.output}
+            {t.output && t.files.length > 0 && ' · '}
+            {t.files.map((f) => f.split(/[\\/]/).pop()).join(', ')}
+          </div>
+          {t.files.length > 0 && (
+            <div>
+              ไฟล์ :{' '}
+              {t.files.map((f, j) => (
+                <span key={f}>
+                  {j > 0 && ', '}
+                  <FileLink href={OPEN + encodeURIComponent(f)}>
+                    <code>{f.split(/[\\/]/).pop()}</code>
+                  </FileLink>
+                </span>
+              ))}
+            </div>
+          )}
+          <pre className="tool-output">{t.console}</pre>
+        </details>
+      ))}
+    </div>
+  )
+}
 
 // Title, start time and tokens of the open session; a chat not sent yet is just "แชตใหม่".
 function ChatHeader({ session }: { session?: Session }): React.JSX.Element {
@@ -140,7 +184,8 @@ function App(): React.JSX.Element {
       const reply = await window.api.send(sessionId, content)
       opening.current = reply.sessionId
       setSessionId(reply.sessionId)
-      setMessages((m) => [...m, { role: 'assistant', content: reply.text }])
+      // Reloaded from the store, so the reply shows its skills and tool calls as a reopened chat does.
+      setMessages(await window.api.history(reply.sessionId))
       setSessions(await window.api.sessions())
     } catch (err) {
       setError(String(err))
@@ -164,9 +209,12 @@ function App(): React.JSX.Element {
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role}`}>
               {m.role === 'assistant' ? (
-                <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
-                  {linkifyPaths(m.content)}
-                </Markdown>
+                <>
+                  {m.turn && <TurnInfo turn={m.turn} />}
+                  <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                    {linkifyPaths(m.content)}
+                  </Markdown>
+                </>
               ) : (
                 m.content
               )}
@@ -177,11 +225,11 @@ function App(): React.JSX.Element {
               {toolLog.map((t) => (
                 <div key={t.id}>
                   <div className={t.running ? 'tool-line running' : 'tool-line'}>
-                    {t.running ? '⏳' : '✓'} {t.name}
+                    {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
                   </div>
                   {jev[t.id] && (
                     <div className={`jev-line jev-${jev[t.id]}`}>
-                      jev : {jev[t.id] === 'inspecting' ? 'inspecting risk' : jev[t.id]}
+                      jev : {JEV_TEXT[jev[t.id]]}
                     </div>
                   )}
                   {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}

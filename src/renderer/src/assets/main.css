@@ -416,6 +416,54 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Skills and tool calls of a turn, above its answer. */
+.turn {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ev-c-gray-3);
+  font-size: 11px;
+  color: var(--ev-c-text-2);
+}
+
+.turn-tool {
+  margin-top: 4px;
+}
+
+/* "tool : input" on the left, +/- at the far right; the whole row toggles. */
+.turn summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.turn summary::-webkit-details-marker {
+  display: none;
+}
+
+.turn-input {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turn summary::after {
+  content: '+';
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+}
+
+.turn details[open] > summary::after {
+  content: '−';
+}
+
+.turn summary:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 1px;
+}
+
 .approval {
   align-self: stretch;
   padding: 12px 14px;
