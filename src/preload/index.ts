@@ -5,6 +5,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   sessions: () => ipcRenderer.invoke('sessions:list'),
   deleteSession: (sessionId: number) => ipcRenderer.invoke('sessions:delete', sessionId),
+  renameSession: (sessionId: number, title: string) => ipcRenderer.invoke('sessions:rename', sessionId, title),
+  pinSession: (sessionId: number, pinned: boolean) => ipcRenderer.invoke('sessions:pin', sessionId, pinned),
   history: (sessionId: number) => ipcRenderer.invoke('chat:history', sessionId),
   send: (sessionId: number | null, content: string) => ipcRenderer.invoke('chat:send', sessionId, content),
   onTool: (cb: (event: { id: string; name: string; running: boolean }) => void) => {
@@ -19,6 +21,7 @@ const api = {
   },
   approve: (id: string, ok: boolean) => ipcRenderer.send('chat:approval', id, ok),
   openPath: (path: string) => ipcRenderer.invoke('file:open', path),
+  pickFiles: () => ipcRenderer.invoke('file:pick'),
   onJev: (cb: (update: { id: string; status: 'inspecting' | 'safe' | 'risk' }) => void) => {
     const listener = (_: unknown, update: { id: string; status: 'inspecting' | 'safe' | 'risk' }): void => cb(update)
     ipcRenderer.on('chat:jev', listener)
@@ -33,6 +36,11 @@ const api = {
     const listener = (_: unknown, output: { id: string; chunk: string }): void => cb(output)
     ipcRenderer.on('chat:tool-output', listener)
     return () => ipcRenderer.off('chat:tool-output', listener)
+  },
+  onText: (cb: (text: { delta: string }) => void) => {
+    const listener = (_: unknown, text: { delta: string }): void => cb(text)
+    ipcRenderer.on('chat:text', listener)
+    return () => ipcRenderer.off('chat:text', listener)
   }
 }
 

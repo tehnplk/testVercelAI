@@ -16,6 +16,7 @@ export type ChatMessage = {
 export type Session = {
   id: number
   title: string
+  pinned: boolean
   createdAt: Date
   updatedAt: Date
   agentInputTokens: number | null
@@ -68,6 +69,7 @@ async function migrate(): Promise<void> {
     END $$;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_input_tokens int;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_output_tokens int;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;
   `)
   // Messages from before sessions existed go into one session.
   const orphans = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM messages WHERE session_id IS NULL')
@@ -97,7 +99,7 @@ export async function newSession(title: string): Promise<number> {
 export async function listSessions(): Promise<Session[]> {
   await ready
   const { rows } = await db.query<Session>(`
-    SELECT s.id, s.title, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
+    SELECT s.id, s.title, s.pinned, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
       s.agent_input_tokens AS "agentInputTokens", s.agent_output_tokens AS "agentOutputTokens",
       s.guard_input_tokens AS "guardInputTokens", s.guard_output_tokens AS "guardOutputTokens"
     FROM sessions s LEFT JOIN messages m ON m.session_id = s.id
@@ -124,6 +126,16 @@ export async function addUsage(sessionId: number, u: Partial<TokenUsage>): Promi
   return rows[0]
 }
 
+export async function renameSession(sessionId: number, title: string): Promise<void> {
+  await ready
+  await db.query('UPDATE sessions SET title = $2 WHERE id = $1', [sessionId, title])
+}
+
+export async function setPinned(sessionId: number, pinned: boolean): Promise<void> {
+  await ready
+  await db.query('UPDATE sessions SET pinned = $2 WHERE id = $1', [sessionId, pinned])
+}
+
 export async function deleteSession(sessionId: number): Promise<void> {
   await ready
   await db.transaction(async (tx) => {
@@ -132,15 +144,29 @@ export async function deleteSession(sessionId: number): Promise<void> {
   })
 }
 
-// Full messages, tool calls and results included, so the model sees what it did in earlier turns.
-// ponytail: whole session history every turn, including tool results; trim old turns if context gets too long.
+// Turns (a user message up to the next) sent in full, the current one included; older turns are cut down.
+const fullTurns = 3
+const noAnswer = '(turn นี้ใช้ tool แล้วไม่มีคำตอบเป็นข้อความ)'
+
+// The last fullTurns turns as stored, tool calls and results included, so the model sees what it just did.
+// Older turns send only the user message and the text of the turn's last message when it is an assistant's
+// (a turn that ends on a tool result, e.g. at the step limit, has no final text).
+// ponytail: fixed turn count, not tokens; a long last turn is still sent whole.
 export async function loadModelMessages(sessionId: number): Promise<ModelMessage[]> {
   await ready
   const { rows } = await db.query<{ role: string; content: string; message: ModelMessage | null }>(
     'SELECT role, content, message FROM messages WHERE session_id = $1 ORDER BY id',
     [sessionId]
   )
-  return rows.map((r) => withoutImages(r.message ?? ({ role: r.role, content: r.content } as ModelMessage)))
+  const all = rows.map((r) => withoutImages(r.message ?? ({ role: r.role, content: r.content } as ModelMessage)))
+  const starts = all.flatMap((m, i) => (m.role === 'user' ? [i] : []))
+  const cut = starts.length > fullTurns ? starts[starts.length - fullTurns] : 0
+  const old: ModelMessage[] = []
+  for (const m of all.slice(0, cut))
+    if (m.role === 'user') old.push(m, { role: 'assistant', content: noAnswer })
+    // A tool message has no text parts, so it resets the answer.
+    else if (old.length) old[old.length - 1] = { role: 'assistant', content: textOf(m).trim() || noAnswer }
+  return [...old, ...all.slice(cut)]
 }
 
 // An image a tool result showed (viewImage) is sent to the model only in the turn that viewed it;
@@ -274,7 +300,7 @@ export async function loadChat(sessionId: number): Promise<ChatMessage[]> {
     for (const p of parts)
       if (p.type === 'tool-call') calls.push(p)
       else if (p.type === 'tool-result') results.set(p.toolCallId ?? '', p)
-    if ((r.role === 'user' || r.role === 'assistant') && r.content !== '') {
+    if ((r.role === 'user' || r.role === 'assistant') && r.content.trim() !== '') {
       const m: ChatMessage = { role: r.role, content: r.content }
       chat.push(m)
       if (r.role === 'assistant') answer = m

@@ -1,9 +1,9 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { generateText, isStepCount } from 'ai'
+import { isStepCount, streamText } from 'ai'
 import { model } from './llm_model'
 import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
@@ -18,7 +18,9 @@ import {
   loadChat,
   loadModelMessages,
   newSession,
+  renameSession,
   saveMessages,
+  setPinned,
   type TokenUsage
 } from './llm_memory'
 
@@ -79,6 +81,17 @@ app.whenReady().then(() => {
     if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
     return deleteSession(sessionId as number)
   })
+  ipcMain.handle('sessions:rename', (_, sessionId: unknown, title: unknown) => {
+    if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
+    const t = typeof title === 'string' ? title.trim() : ''
+    if (t.length < 1 || t.length > 200) throw new Error('Invalid title')
+    return renameSession(sessionId as number, t)
+  })
+  ipcMain.handle('sessions:pin', (_, sessionId: unknown, pinned: unknown) => {
+    if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
+    if (typeof pinned !== 'boolean') throw new Error('Invalid pinned')
+    return setPinned(sessionId as number, pinned)
+  })
 
   // Files that would run when opened are shown in Explorer instead.
   const runnable = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|lnk|scr|hta|reg|jar|py|pyw|sh|cpl)$/i
@@ -90,6 +103,14 @@ app.whenReady().then(() => {
       return ''
     }
     return shell.openPath(path)
+  })
+
+  // Full paths of the files the user picks to attach; empty when canceled.
+  ipcMain.handle('file:pick', async (event) => {
+    const { filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender)!, {
+      properties: ['openFile', 'multiSelections']
+    })
+    return filePaths
   })
 
   ipcMain.handle('chat:history', (_, sessionId: unknown) => {
@@ -108,7 +129,8 @@ app.whenReady().then(() => {
   ipcMain.handle('chat:send', async (event, sessionId: unknown, content: unknown) => {
     if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
     if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
-    const id = sessionId ?? (await newSession(content.trim().slice(0, 60)))
+    // The renderer appends attached file paths after "\n\nไฟล์แนบ:\n"; they are not part of the title.
+    const id = sessionId ?? (await newSession(content.split('\n\nไฟล์แนบ:\n')[0].trim().slice(0, 60)))
     await saveMessages(id, [{ role: 'user', content }])
     // Stored after every agent step and Jev call, so a reply that fails halfway keeps what it spent,
     // and the header follows live. A provider that reports no count adds 0.
@@ -139,7 +161,7 @@ app.whenReady().then(() => {
     const messages = await loadModelMessages(id)
     // Read on every message, so a skill folder added while the app runs is picked up.
     const skills = discoverSkills()
-    const { text, responseMessages } = await generateText({
+    const result = streamText({
       model,
       system: systemPrompt + skillsPrompt(skills),
       tools: {
@@ -159,8 +181,14 @@ app.whenReady().then(() => {
       // Per step only; the all-steps total (result.usage) is not added again.
       onStepEnd: ({ usage }) => countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
     })
-    await saveMessages(id, responseMessages)
-    return { sessionId: id, text }
+    // Text of every step goes to the pending bubble as it is written. streamText keeps going after an
+    // error part (only logging it), so it is thrown here to fail the reply as generateText did.
+    for await (const part of result.stream) {
+      if (part.type === 'text-delta') event.sender.send('chat:text', { delta: part.text })
+      else if (part.type === 'error') throw part.error
+    }
+    await saveMessages(id, await result.responseMessages)
+    return { sessionId: id, text: await result.text }
   })
 
   createWindow()

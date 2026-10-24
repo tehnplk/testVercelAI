@@ -13,6 +13,49 @@ const JEV_TEXT: Record<JevStatus, string> = {
   risk: 'มีความเสี่ยง'
 }
 
+const ATTACH_HEAD = 'ไฟล์แนบ:\n'
+
+const baseName = (path: string): string => path.split(/[\\/]/).pop() || path
+
+// Splits a sent message into its text and the attached file paths (see send).
+function splitAttachments(content: string): { text: string; files: string[] } {
+  const at = content.indexOf('\n\n' + ATTACH_HEAD)
+  if (at < 0) return { text: content, files: [] }
+  return { text: content.slice(0, at), files: content.slice(at + 2 + ATTACH_HEAD.length).split('\n').filter(Boolean) }
+}
+
+// A file shown by its name only; the full path is in the tooltip. Has a remove button when onRemove is given.
+function FileChip({ path, onRemove, disabled }: { path: string; onRemove?: () => void; disabled?: boolean }): React.JSX.Element {
+  const name = baseName(path)
+  return (
+    <span className="file-chip" title={path}>
+      <span className="file-chip-name">{name}</span>
+      {onRemove && (
+        <button type="button" aria-label={`เอาไฟล์ ${name} ออก`} disabled={disabled} onClick={onRemove}>
+          ×
+        </button>
+      )}
+    </span>
+  )
+}
+
+// A user message: its text, then the attached files as chips.
+function UserMessage({ content }: { content: string }): React.JSX.Element {
+  const { text, files } = splitAttachments(content)
+  return (
+    <>
+      {text}
+      {files.length > 0 && (
+        <div className="file-chips">
+          {files.map((f) => (
+            <FileChip key={f} path={f} />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 // Skills and tool calls of a turn, shown above its final answer.
 function TurnInfo({ turn }: { turn: NonNullable<ChatMessage['turn']> }): React.JSX.Element {
   return (
@@ -102,6 +145,8 @@ function App(): React.JSX.Element {
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  // Full paths of the files attached to the next message; the composer shows only their names.
+  const [attachments, setAttachments] = useState<string[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Tool calls of the turn in progress, kept until the reply arrives; most finish in milliseconds.
@@ -109,8 +154,11 @@ function App(): React.JSX.Element {
   // Live console output and Jev's verdict per tool call id.
   const [toolOutput, setToolOutput] = useState<Record<string, string>>({})
   const [jev, setJev] = useState<Record<string, JevStatus>>({})
+  // Answer text streamed so far; the reload from history replaces it when the reply ends.
+  const [streamed, setStreamed] = useState('')
   const [approval, setApproval] = useState<ApprovalRequest | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
+  const textarea = useRef<HTMLTextAreaElement>(null)
   const opening = useRef<number | null>(null)
 
   // null opens an empty chat; the session is created when its first message is sent.
@@ -128,6 +176,16 @@ function App(): React.JSX.Element {
     if (id === sessionId) openSession(null)
   }
 
+  const renameSession = async (id: number, title: string): Promise<void> => {
+    await window.api.renameSession(id, title)
+    setSessions((list) => list.map((s) => (s.id === id ? { ...s, title } : s)))
+  }
+
+  const pinSession = async (id: number, pinned: boolean): Promise<void> => {
+    await window.api.pinSession(id, pinned)
+    setSessions((list) => list.map((s) => (s.id === id ? { ...s, pinned } : s)))
+  }
+
   useEffect(() => {
     window.api.sessions().then((list) => {
       setSessions(list)
@@ -141,6 +199,7 @@ function App(): React.JSX.Element {
       setToolOutput((o) => ({ ...o, [id]: ((o[id] ?? '') + chunk).slice(-20000) }))
     )
     const offJev = window.api.onJev(({ id, status }) => setJev((j) => ({ ...j, [id]: status })))
+    const offText = window.api.onText(({ delta }) => setStreamed((s) => s + delta))
     // Live token totals during a reply. On a new chat the first update names the session it created,
     // so the header shows it before the reply arrives.
     const offUsage = window.api.onUsage(({ sessionId: id, ...usage }) => {
@@ -156,12 +215,13 @@ function App(): React.JSX.Element {
       offApprove()
       offOutput()
       offJev()
+      offText()
     }
   }, [])
 
   useEffect(() => {
     bottom.current?.scrollIntoView()
-  }, [messages, pending, approval, toolLog, toolOutput])
+  }, [messages, pending, approval, toolLog, toolOutput, streamed])
 
   const answer = (ok: boolean): void => {
     if (!approval) return
@@ -169,16 +229,27 @@ function App(): React.JSX.Element {
     setApproval(null)
   }
 
+  // Adds the picked file paths to the attachments, skipping ones already there.
+  const attach = async (): Promise<void> => {
+    const paths = await window.api.pickFiles()
+    if (paths.length) setAttachments((a) => [...a, ...paths.filter((p, i) => !a.includes(p) && paths.indexOf(p) === i)])
+    textarea.current?.focus()
+  }
+
   const send = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
-    const content = input.trim()
-    if (!content || pending) return
+    const text = input.trim()
+    if (!text || pending) return
+    // The model gets the full paths; the chat bubble turns them back into chips (splitAttachments).
+    const content = attachments.length ? text + '\n\n' + ATTACH_HEAD + attachments.join('\n') : text
     setInput('')
+    setAttachments([])
     setError(null)
     setPending(true)
     setToolLog([])
     setToolOutput({})
     setJev({})
+    setStreamed('')
     setMessages((m) => [...m, { role: 'user', content }])
     try {
       const reply = await window.api.send(sessionId, content)
@@ -202,6 +273,8 @@ function App(): React.JSX.Element {
         disabled={pending}
         onOpen={openSession}
         onDelete={deleteSession}
+        onRename={renameSession}
+        onPin={pinSession}
       />
       <div className="chat">
         <ChatHeader session={sessions.find((s) => s.id === sessionId)} />
@@ -216,7 +289,7 @@ function App(): React.JSX.Element {
                   </Markdown>
                 </>
               ) : (
-                m.content
+                <UserMessage content={m.content} />
               )}
             </div>
           ))}
@@ -235,6 +308,11 @@ function App(): React.JSX.Element {
                   {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}
                 </div>
               ))}
+              {streamed && (
+                <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                  {linkifyPaths(streamed)}
+                </Markdown>
+              )}
               <div>
                 {toolLog.some((t) => t.running)
                   ? `กำลังเรียก tool: ${toolLog.filter((t) => t.running).map((t) => t.name).join(', ')}…`
@@ -259,19 +337,46 @@ function App(): React.JSX.Element {
           <div ref={bottom} />
         </main>
         <form className="composer" onSubmit={send}>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                e.currentTarget.form?.requestSubmit()
-              }
-            }}
-            placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
-            rows={1}
-            autoFocus
-          />
+          <div className="composer-box">
+            {attachments.length > 0 && (
+              <div className="file-chips">
+                {attachments.map((p) => (
+                  <FileChip
+                    key={p}
+                    path={p}
+                    disabled={pending}
+                    onRemove={() => setAttachments((a) => a.filter((x) => x !== p))}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="composer-row">
+              <button
+                type="button"
+                className="attach"
+                aria-label="แนบไฟล์"
+                title="แนบไฟล์"
+                disabled={pending}
+                onClick={attach}
+              >
+                +
+              </button>
+              <textarea
+                ref={textarea}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    e.currentTarget.form?.requestSubmit()
+                  }
+                }}
+                placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
+                rows={1}
+                autoFocus
+              />
+            </div>
+          </div>
           <button type="submit" disabled={pending || !input.trim()}>
             ส่ง
           </button>

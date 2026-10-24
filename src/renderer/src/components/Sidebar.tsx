@@ -47,55 +47,116 @@ const trashIcon = (
   </svg>
 )
 
+// Filled while the chat is pinned.
+const pinIcon = (pinned: boolean): React.JSX.Element => (
+  <svg
+    viewBox="0 0 24 24"
+    width="14"
+    height="14"
+    fill={pinned ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+  </svg>
+)
+
+const pencilIcon = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+)
+
 type Props = {
   sessions: Session[]
   sessionId: number | null
   disabled: boolean
   onOpen: (id: number | null) => void
   onDelete: (id: number) => void
+  onRename: (id: number, title: string) => void
+  onPin: (id: number, pinned: boolean) => void
 }
 
-function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete }: Props): React.JSX.Element {
+function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, onPin }: Props): React.JSX.Element {
   const [layout, setLayout] = useState(loadLayout)
   const [dragging, setDragging] = useState(false)
   const [query, setQuery] = useState('')
+  const [renaming, setRenaming] = useState<number | null>(null)
 
-  // Sessions arrive newest first, so groups fill in display order and empty ones never appear.
+  // Sessions arrive newest first and pinned ones go first, so groups fill in display order
+  // (pinned, then by date) and empty ones never appear.
   const today = dayStart(new Date())
   const q = query.trim().toLowerCase()
   const groups = new Map<string, React.JSX.Element[]>()
-  for (const s of sessions) {
+  for (const s of [...sessions.filter((x) => x.pinned), ...sessions.filter((x) => !x.pinned)]) {
     const title = displayTitle(s.title)
     if (q && !`${s.title}\n${title}`.toLowerCase().includes(q)) continue
     const updated = new Date(s.updatedAt)
     const days = Math.round((today - dayStart(updated)) / DAY)
-    const group = groupOf(days)
+    const group = s.pinned ? 'ปักหมุด' : groupOf(days)
     if (!groups.has(group)) groups.set(group, [])
     groups.get(group)!.push(
       <div key={s.id} className={s.id === sessionId ? 'session active' : 'session'}>
-        <button
-          className="session-open"
-          onClick={() => onOpen(s.id)}
-          disabled={disabled}
-          title={s.title}
-          aria-current={s.id === sessionId ? 'page' : undefined}
-        >
-          <span className="session-title">{title}</span>
-          <time className="session-time" dateTime={updated.toISOString()}>
-            {timeOf(updated, days)}
-          </time>
-        </button>
-        <button
-          className="session-delete"
-          onClick={() => {
-            if (confirm(`ลบแชต "${title}" และข้อความทั้งหมด?`)) onDelete(s.id)
-          }}
-          disabled={disabled}
-          aria-label={`ลบแชต ${title}`}
-          title="ลบแชต"
-        >
-          {trashIcon}
-        </button>
+        {renaming === s.id ? (
+          // Enter or blur saves; Esc puts the old title back first, so the save is skipped. Empty cancels too.
+          <input
+            className="session-rename"
+            defaultValue={s.title}
+            maxLength={200}
+            autoFocus
+            aria-label="ชื่อแชต"
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') e.currentTarget.value = s.title
+              if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
+            }}
+            onBlur={(e) => {
+              const t = e.currentTarget.value.trim()
+              if (t && t !== s.title) onRename(s.id, t)
+              setRenaming(null)
+            }}
+          />
+        ) : (
+          <>
+            <button
+              className="session-open"
+              onClick={() => onOpen(s.id)}
+              disabled={disabled}
+              title={s.title}
+              aria-current={s.id === sessionId ? 'page' : undefined}
+            >
+              <span className="session-title">{title}</span>
+              <time className="session-time" dateTime={updated.toISOString()}>
+                {timeOf(updated, days)}
+              </time>
+            </button>
+            <div className="session-actions">
+              <button
+                onClick={() => onPin(s.id, !s.pinned)}
+                disabled={disabled}
+                aria-label={s.pinned ? 'เลิกปักหมุด' : 'ปักหมุด'}
+                title={s.pinned ? 'เลิกปักหมุด' : 'ปักหมุด'}
+              >
+                {pinIcon(s.pinned)}
+              </button>
+              <button onClick={() => setRenaming(s.id)} disabled={disabled} aria-label="เปลี่ยนชื่อ" title="เปลี่ยนชื่อ">
+                {pencilIcon}
+              </button>
+              <button
+                className="session-delete"
+                onClick={() => {
+                  if (confirm(`ลบแชต "${title}" และข้อความทั้งหมด?`)) onDelete(s.id)
+                }}
+                disabled={disabled}
+                aria-label={`ลบแชต ${title}`}
+                title="ลบแชต"
+              >
+                {trashIcon}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     )
   }

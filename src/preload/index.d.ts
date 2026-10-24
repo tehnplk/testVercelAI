@@ -12,6 +12,7 @@ declare global {
   type Session = {
     id: number
     title: string
+    pinned: boolean
     createdAt: Date
     updatedAt: Date
     agentInputTokens: number | null
@@ -33,6 +34,9 @@ declare global {
     api: {
       sessions: () => Promise<Session[]>
       deleteSession: (sessionId: number) => Promise<void>
+      /** The title is trimmed and must be 1 to 200 characters. */
+      renameSession: (sessionId: number, title: string) => Promise<void>
+      pinSession: (sessionId: number, pinned: boolean) => Promise<void>
       history: (sessionId: number) => Promise<ChatMessage[]>
       send: (sessionId: number | null, content: string) => Promise<{ sessionId: number; text: string }>
       onTool: (cb: (event: ToolEvent) => void) => () => void
@@ -40,8 +44,12 @@ declare global {
       approve: (id: string, ok: boolean) => void
       /** Resolves to '' on success, otherwise an error message. */
       openPath: (path: string) => Promise<string>
+      /** Full paths chosen in the file dialog; empty when canceled. */
+      pickFiles: () => Promise<string[]>
       onJev: (cb: (update: { id: string; status: JevStatus }) => void) => () => void
       onToolOutput: (cb: (output: { id: string; chunk: string }) => void) => () => void
+      /** Answer text as the model writes it, from every step of the reply in progress. */
+      onText: (cb: (text: { delta: string }) => void) => () => void
       /** New token totals of a session, sent after every agent step and Jev call. */
       onUsage: (cb: (usage: UsageUpdate) => void) => () => void
     }

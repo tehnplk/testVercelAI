@@ -165,11 +165,18 @@ body {
   white-space: nowrap;
 }
 
-/* The delete button takes the time's place on hover or keyboard focus. */
-.session-delete {
+/* The pin, rename and delete buttons take the time's place on hover or keyboard focus;
+   the title then ends before them. */
+.session-actions {
   position: absolute;
   top: 50%;
   right: 6px;
+  display: flex;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.session-actions button {
   display: flex;
   padding: 5px;
   border: none;
@@ -177,23 +184,44 @@ body {
   background: transparent;
   color: var(--ev-c-text-2);
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(-50%);
 }
 
-.session:hover .session-delete,
-.session:focus-within .session-delete {
+.session:hover .session-actions,
+.session:focus-within .session-actions {
   opacity: 1;
 }
 
 .session:hover .session-time,
 .session:focus-within .session-time {
-  visibility: hidden;
+  display: none;
 }
 
-.session-delete:hover:not(:disabled) {
+.session:hover .session-open,
+.session:focus-within .session-open {
+  padding-right: 84px;
+}
+
+.session-actions button:hover:not(:disabled) {
   background: var(--color-background);
+  color: var(--color-text);
+}
+
+.session-actions .session-delete:hover:not(:disabled) {
   color: #ef5350;
+}
+
+/* Same height as the row's button: its 8px padding less the 1px border. */
+.session-rename {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #2f6fed;
+  border-radius: 8px;
+  outline: none;
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.5;
 }
 
 .new-session:hover:not(:disabled),
@@ -212,7 +240,7 @@ body {
   opacity: 0.6;
 }
 
-.session-delete:disabled {
+.session-actions button:disabled {
   cursor: default;
   color: var(--ev-c-text-3);
 }
@@ -220,7 +248,7 @@ body {
 .new-session:focus-visible,
 .session-search:focus-visible,
 .session-open:focus-visible,
-.session-delete:focus-visible {
+.session-actions button:focus-visible {
   outline: 2px solid #2f6fed;
   outline-offset: -2px;
 }
@@ -532,17 +560,111 @@ body {
   background: var(--color-background-soft);
 }
 
+.composer-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 1px solid var(--ev-c-gray-2);
+  background: var(--color-background);
+}
+
+.composer-box:focus-within {
+  border-color: #2f6fed;
+}
+
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 4px 0;
+}
+
+.msg .file-chips {
+  padding: 0;
+  margin-top: 6px;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 200px;
+  padding: 2px 8px;
+  border: 1px solid var(--ev-c-gray-2);
+  border-radius: 6px;
+  background: var(--color-background-mute);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.msg.user .file-chip {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.file-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer .file-chip button {
+  flex: none;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.composer .file-chip button:hover:not(:disabled) {
+  color: #ff6b6b;
+}
+
+.composer .file-chip button:focus-visible {
+  outline: 2px solid #2f6fed;
+}
+
 .composer textarea {
   flex: 1;
   resize: none;
   max-height: 160px;
   field-sizing: content;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--ev-c-gray-2);
-  background: var(--color-background);
+  padding: 10px 8px;
+  border: none;
+  outline: none;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
+}
+
+.composer .attach {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 6px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.composer .attach:hover:not(:disabled) {
+  background: var(--ev-c-gray-3);
+}
+
+.composer .attach:focus-visible {
+  outline: 2px solid #2f6fed;
 }
 
 .composer button {
