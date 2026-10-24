@@ -17,7 +17,7 @@ Electron + electron-vite + React 19 + TypeScript chat app. The agent uses the Ve
 
 - `src/main/index.ts`: window, IPC handlers, chat loop (`generateText` with tools), approvals.
 - `src/main/llm_model.ts`: models (agent model, `riskModel` = Jev).
-- `src/main/llm_shell.ts`: the only tool, `runBash` (Git Bash, streamed output, timeout).
+- `src/main/llm_shell.ts`: the only tool, `Bash` (Git Bash, streamed output, timeout).
 - `src/main/llm_risk.ts`: Jev rates each command SAFE (runs) or RISK (user approves).
 - `src/main/llm_system_prompt.ts`: agent instructions (Thai replies, docx through python-docx).
 - `src/main/llm_memory.ts`: PGlite store for sessions and full model messages.

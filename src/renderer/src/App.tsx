@@ -64,8 +64,8 @@ function ChatHeader({ session }: { session?: Session }): React.JSX.Element {
   const total =
     (session.agentInputTokens ?? 0) +
     (session.agentOutputTokens ?? 0) +
-    (session.jevInputTokens ?? 0) +
-    (session.jevOutputTokens ?? 0)
+    (session.guardInputTokens ?? 0) +
+    (session.guardOutputTokens ?? 0)
   return (
     <header className="chat-header">
       <span className="chat-title" title={session.title}>
@@ -87,7 +87,7 @@ function ChatHeader({ session }: { session?: Session }): React.JSX.Element {
         title={
           tracked
             ? `Agent: in ${count(session.agentInputTokens)} / out ${count(session.agentOutputTokens)}\n` +
-              `Jev: in ${count(session.jevInputTokens)} / out ${count(session.jevOutputTokens)}`
+              `Guard: in ${count(session.guardInputTokens)} / out ${count(session.guardOutputTokens)}`
             : 'เริ่มนับ token หลังแชตนี้ จึงไม่มีตัวเลข'
         }
       >
@@ -229,7 +229,7 @@ function App(): React.JSX.Element {
                   </div>
                   {jev[t.id] && (
                     <div className={`jev-line jev-${jev[t.id]}`}>
-                      jev : {JEV_TEXT[jev[t.id]]}
+                      Guard : {JEV_TEXT[jev[t.id]]}
                     </div>
                   )}
                   {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}
@@ -245,7 +245,7 @@ function App(): React.JSX.Element {
           {approval && (
             <div className="approval">
               <div className="approval-title">Agent ขออนุญาตรัน {approval.tool}</div>
-              <div className="risk">🔴 Jev ประเมินว่า risk: {approval.risk.reason}</div>
+              <div className="risk">🔴 Guard ประเมินว่า risk: {approval.risk.reason}</div>
               <pre>{approval.detail}</pre>
               <div className="approval-actions">
                 <button className="run" onClick={() => answer(true)}>

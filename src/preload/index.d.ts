@@ -16,12 +16,12 @@ declare global {
     updatedAt: Date
     agentInputTokens: number | null
     agentOutputTokens: number | null
-    jevInputTokens: number | null
-    jevOutputTokens: number | null
+    guardInputTokens: number | null
+    guardOutputTokens: number | null
   }
   type UsageUpdate = { sessionId: number } & Pick<
     Session,
-    'agentInputTokens' | 'agentOutputTokens' | 'jevInputTokens' | 'jevOutputTokens'
+    'agentInputTokens' | 'agentOutputTokens' | 'guardInputTokens' | 'guardOutputTokens'
   >
   type Risk ={ level: 'safe' | 'risk'; reason: string }
   type JevStatus = 'inspecting' | Risk['level']

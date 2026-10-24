@@ -3,7 +3,7 @@ import { join } from 'path'
 import { PGlite } from '@electric-sql/pglite'
 import type { ModelMessage } from 'ai'
 
-// input: what the call was for (runBash's purpose); output: one line of what it produced, besides files
+// input: what the call was for (Bash's purpose); output: one line of what it produced, besides files
 // (the paths it saved); console: its full result as shown in the console.
 export type ToolCall = { name: string; input: string; output: string; files: string[]; console: string }
 // turn: skills and tool calls of the turn, on its final answer only.
@@ -20,11 +20,14 @@ export type Session = {
   updatedAt: Date
   agentInputTokens: number | null
   agentOutputTokens: number | null
-  jevInputTokens: number | null
-  jevOutputTokens: number | null
+  guardInputTokens: number | null
+  guardOutputTokens: number | null
 }
-export type TokenUsage = { agentInput: number; agentOutput: number; jevInput: number; jevOutput: number }
-export type SessionUsage = Pick<Session, 'agentInputTokens' | 'agentOutputTokens' | 'jevInputTokens' | 'jevOutputTokens'>
+export type TokenUsage = { agentInput: number; agentOutput: number; guardInput: number; guardOutput: number }
+export type SessionUsage = Pick<
+  Session,
+  'agentInputTokens' | 'agentOutputTokens' | 'guardInputTokens' | 'guardOutputTokens'
+>
 
 const db = new PGlite(join(app.getPath('userData'), 'pgdata'))
 
@@ -47,8 +50,24 @@ async function migrate(): Promise<void> {
     -- NULL: the session is older than token counting.
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_input_tokens int;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agent_output_tokens int;
-    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jev_input_tokens int;
-    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS jev_output_tokens int;
+    -- The risk checker's columns were named jev_*; rename them once, keeping their values.
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+                   AND table_name = 'sessions' AND column_name = 'jev_input_tokens')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+                   AND table_name = 'sessions' AND column_name = 'guard_input_tokens') THEN
+        ALTER TABLE sessions RENAME COLUMN jev_input_tokens TO guard_input_tokens;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+                   AND table_name = 'sessions' AND column_name = 'jev_output_tokens')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+                   AND table_name = 'sessions' AND column_name = 'guard_output_tokens') THEN
+        ALTER TABLE sessions RENAME COLUMN jev_output_tokens TO guard_output_tokens;
+      END IF;
+    END $$;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_input_tokens int;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_output_tokens int;
   `)
   // Messages from before sessions existed go into one session.
   const orphans = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM messages WHERE session_id IS NULL')
@@ -80,7 +99,7 @@ export async function listSessions(): Promise<Session[]> {
   const { rows } = await db.query<Session>(`
     SELECT s.id, s.title, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
       s.agent_input_tokens AS "agentInputTokens", s.agent_output_tokens AS "agentOutputTokens",
-      s.jev_input_tokens AS "jevInputTokens", s.jev_output_tokens AS "jevOutputTokens"
+      s.guard_input_tokens AS "guardInputTokens", s.guard_output_tokens AS "guardOutputTokens"
     FROM sessions s LEFT JOIN messages m ON m.session_id = s.id
     GROUP BY s.id
     ORDER BY "updatedAt" DESC, s.id DESC
@@ -95,12 +114,12 @@ export async function addUsage(sessionId: number, u: Partial<TokenUsage>): Promi
     `UPDATE sessions SET
        agent_input_tokens = coalesce(agent_input_tokens, 0) + $2,
        agent_output_tokens = coalesce(agent_output_tokens, 0) + $3,
-       jev_input_tokens = coalesce(jev_input_tokens, 0) + $4,
-       jev_output_tokens = coalesce(jev_output_tokens, 0) + $5
+       guard_input_tokens = coalesce(guard_input_tokens, 0) + $4,
+       guard_output_tokens = coalesce(guard_output_tokens, 0) + $5
      WHERE id = $1
      RETURNING agent_input_tokens AS "agentInputTokens", agent_output_tokens AS "agentOutputTokens",
-       jev_input_tokens AS "jevInputTokens", jev_output_tokens AS "jevOutputTokens"`,
-    [sessionId, u.agentInput ?? 0, u.agentOutput ?? 0, u.jevInput ?? 0, u.jevOutput ?? 0]
+       guard_input_tokens AS "guardInputTokens", guard_output_tokens AS "guardOutputTokens"`,
+    [sessionId, u.agentInput ?? 0, u.agentOutput ?? 0, u.guardInput ?? 0, u.guardOutput ?? 0]
   )
   return rows[0]
 }
@@ -161,10 +180,10 @@ function shown(name: string, result: Part | undefined): Pick<ToolCall, 'output' 
       : o.type === 'execution-denied'
         ? (o.reason ?? 'execution denied')
         : JSON.stringify(o.value ?? o)
-  if (o.type === 'execution-denied' || (name === 'runBash' && text.startsWith('The user denied this run')))
+  if (o.type === 'execution-denied' || (name === 'Bash' && text.startsWith('The user denied this run')))
     return { output: 'ถูกปฏิเสธ', files: [], console: cap(text) }
-  // runBash's result: status line, then stdout and stderr under their headers (see llm_shell.ts).
-  const run = name === 'runBash' ? text.match(/^(.*)\n--- stdout ---\n([\s\S]*)\n--- stderr ---\n([\s\S]*)$/) : null
+  // Bash's result: status line, then stdout and stderr under their headers (see llm_shell.ts).
+  const run = name === 'Bash' ? text.match(/^(.*)\n--- stdout ---\n([\s\S]*)\n--- stderr ---\n([\s\S]*)$/) : null
   const [, status, stdout, stderr] = run ?? ['', 'exit code 0', text, '']
   const saved = labeled(stdout, 'Saved')
   const results = labeled(stdout, 'Result')
@@ -202,12 +221,15 @@ export async function loadChat(sessionId: number): Promise<ChatMessage[]> {
     ].filter((n): n is string => typeof n === 'string')
     const tools = calls
       .filter((c) => c.toolName !== 'loadSkill')
-      .map((c) => ({
-        name: c.toolName ?? '',
-        // Calls stored before runBash had a purpose show a dash.
-        input: typeof c.input?.purpose === 'string' && c.input.purpose ? c.input.purpose : '—',
-        ...shown(c.toolName ?? '', results.get(c.toolCallId ?? ''))
-      }))
+      .map((c) => {
+        const name = c.toolName === 'runBash' ? 'Bash' : (c.toolName ?? '')
+        return {
+          name,
+          // Calls stored before Bash had a purpose show a dash.
+          input: typeof c.input?.purpose === 'string' && c.input.purpose ? c.input.purpose : '—',
+          ...shown(name, results.get(c.toolCallId ?? ''))
+        }
+      })
     if (answer && (skills.length || tools.length)) answer.turn = { skills, tools }
     answer = undefined
     calls = []

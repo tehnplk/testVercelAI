@@ -95,7 +95,7 @@ async function summarize(
 // request: the user's message this run serves; onUsage counts the summary model's tokens.
 export function shellTools(approve: Approve, onOutput: OnOutput, request: string, onUsage: OnUsage) {
   return {
-    runBash: tool({
+    Bash: tool({
       description:
         "Run a command in Git Bash on the user's Windows computer and return its exit code, stdout and stderr. " +
         'Risky runs need the user\'s approval. Windows paths look like /c/Users/... in bash. ' +
@@ -114,7 +114,7 @@ export function shellTools(approve: Approve, onOutput: OnOutput, request: string
         { toolCallId }: { toolCallId: string }
       ) => {
         const dir = cwd ?? app.getPath('home')
-        if (!(await approve('runBash', `${dir}\n$ ${command}`, toolCallId)))
+        if (!(await approve('Bash', `${dir}\n$ ${command}`, toolCallId)))
           return 'The user denied this run. Do not retry it unless the user asks.'
         const result = await run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
         // The chat shows a run's "Saved:"/"Result:" lines as its output; a run that printed none gets one

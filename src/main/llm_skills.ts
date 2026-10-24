@@ -70,7 +70,7 @@ export function skillsPrompt(skills: Skill[]): string {
   if (!skills.length) return ''
   return `
 
-Skills are instructions for particular kinds of tasks. When the user's request matches a skill's description, your first tool call must be loadSkill with that skill's name; do not try another way first. Then follow what it returns. Paths inside a skill are relative to that skill's directory, which loadSkill gives you; read those files with runBash when the skill says to.
+Skills are instructions for particular kinds of tasks. When the user's request matches a skill's description, your first tool call must be loadSkill with that skill's name; do not try another way first. Then follow what it returns. Paths inside a skill are relative to that skill's directory, which loadSkill gives you; read those files with Bash when the skill says to.
 ${skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`
 }
 

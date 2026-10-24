@@ -123,7 +123,7 @@ app.whenReady().then(() => {
     const approve = async (tool: string, detail: string, toolCallId: string): Promise<boolean> => {
       event.sender.send('chat:jev', { id: toolCallId, status: 'inspecting' })
       const { risk, usage } = await assessRisk(tool, detail, ran)
-      await countUsage({ jevInput: usage?.inputTokens, jevOutput: usage?.outputTokens })
+      await countUsage({ guardInput: usage?.inputTokens, guardOutput: usage?.outputTokens })
       event.sender.send('chat:jev', { id: toolCallId, status: risk.level })
       const ok =
         risk.level === 'safe' ||
