@@ -591,6 +591,10 @@ body {
   color: var(--ev-c-text-2);
 }
 
+.turn + .turn {
+  margin-top: 6px;
+}
+
 .turn-tool {
   margin-top: 4px;
 }
