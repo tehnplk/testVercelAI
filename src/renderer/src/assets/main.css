@@ -352,6 +352,9 @@ body {
 }
 
 .profile-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 10px;
   border: none;
   border-radius: 6px;
@@ -360,6 +363,10 @@ body {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.profile-menu svg {
+  flex-shrink: 0;
 }
 
 .profile-menu button:hover:not(:disabled) {

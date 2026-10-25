@@ -78,6 +78,19 @@ const checkIcon = (
   </svg>
 )
 
+// Profile menu icons (16px, Lucide bookmark and trash-2).
+const memoryIcon = (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+  </svg>
+)
+
+const clearIcon = (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
+  </svg>
+)
+
 type Props = {
   sessions: Session[]
   sessionId: number | null
@@ -272,6 +285,7 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onClear, onR
                     setShowMemory(true)
                   }}
                 >
+                  {memoryIcon}
                   ความจำ
                 </button>
                 <button
@@ -283,6 +297,7 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onClear, onR
                     if (confirm(`ล้างประวัติแชตทั้งหมด ${sessions.length} แชต? การลบนี้ย้อนกลับไม่ได้`)) onClear()
                   }}
                 >
+                  {clearIcon}
                   ล้างประวัติแชต
                 </button>
               </div>
