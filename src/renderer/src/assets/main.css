@@ -4,10 +4,31 @@
   color-scheme: dark;
 }
 
-/* One thin dark scrollbar everywhere; scrollbar-color has no hover state, so the thumb stays #3e4452. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3e4452 transparent;
+/* One thin dark scrollbar everywhere. Do not add scrollbar-width/scrollbar-color: Chromium then ignores these pseudo-elements. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3e4452;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5263;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 body {
