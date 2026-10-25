@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ExtraProps } from 'react-markdown'
+import FileLink, { OPEN } from './FileLink'
 
 // The full image in a modal <dialog>: Esc, the close button or a click anywhere closes it.
 function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }): React.JSX.Element {
@@ -18,8 +19,49 @@ function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose:
   )
 }
 
-// An answer's ![alt](src), loaded by the main process (image:load) as a data: URL; the raw src never reaches the DOM.
+// A local video file, streamed by the main process's app-media: scheme (serveVideo), which checks the path.
+function MarkdownVideo({ src, alt }: { src: string; alt: string }): React.JSX.Element {
+  const [failed, setFailed] = useState(false)
+  let path = ''
+  try {
+    path = decodeURIComponent(src.replace(/^file:\/\/\//i, ''))
+  } catch {
+    /* app-media refuses the empty path */
+  }
+  const name = path.split(/[\\/]/).pop() || path
+  return (
+    <span className="md-video">
+      {failed ? (
+        <span className="md-image-status error">
+          {alt && `${alt}: `}เล่นวิดีโอไม่ได้
+        </span>
+      ) : (
+        <video
+          controls
+          preload="metadata"
+          src={'app-media://video/' + encodeURIComponent(path)}
+          aria-label={alt || name}
+          onError={() => setFailed(true)}
+        />
+      )}
+      <span className="md-video-caption">
+        {name} · <FileLink href={OPEN + encodeURIComponent(path)}>เปิด</FileLink>
+      </span>
+    </span>
+  )
+}
+
+// Local video files only; a web URL ending in .mp4 still goes to image:load, which refuses it.
+const video = /\.(mp4|webm|mov|m4v)$/i
+
+// An answer's ![alt](src): a video file plays in a <video>; an image is loaded by the main process (image:load)
+// as a data: URL, so the raw src never reaches the DOM.
 function MarkdownImage({ src, alt = '' }: React.ComponentProps<'img'> & ExtraProps): React.JSX.Element {
+  if (src && video.test(src) && !/^https?:\/\//i.test(src)) return <MarkdownVideo key={src} src={src} alt={alt} />
+  return <LoadedImage src={src} alt={alt} />
+}
+
+function LoadedImage({ src, alt }: { src?: string; alt: string }): React.JSX.Element {
   // The result with the src it is for, so a changed src shows the placeholder until its own result arrives.
   const [loaded, setLoaded] = useState<{ for: string; result: { src: string } | { error: string } } | null>(null)
   const [open, setOpen] = useState(false)

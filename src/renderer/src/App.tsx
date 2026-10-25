@@ -19,7 +19,8 @@ function LiveCodeBlock(props: React.ComponentProps<'pre'> & ExtraProps): React.J
 }
 const liveComponents = { ...components, pre: LiveCodeBlock }
 
-// Image sources stay as written (local Windows paths too): MarkdownImage loads them only through image:load.
+// Image sources stay as written (local Windows paths too): MarkdownImage loads them only through image:load,
+// or app-media: for videos.
 const urlTransform = (url: string, key: string): string => (key === 'src' ? url : defaultUrlTransform(url))
 
 const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')

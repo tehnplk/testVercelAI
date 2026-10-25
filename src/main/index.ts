@@ -1,7 +1,8 @@
-import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain, protocol } from 'electron'
 import { extname, join } from 'path'
-import { existsSync } from 'fs'
+import { createReadStream, existsSync } from 'fs'
 import { readFile, realpath, stat } from 'fs/promises'
+import { Readable } from 'stream'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { isStepCount, streamText } from 'ai'
@@ -87,6 +88,54 @@ function createWindow(): void {
   }
 }
 
+// app-media://video/<encodeURIComponent(full path)> streams a local video to the answer's <video> (MarkdownImage).
+// stream: true lets <video> read it in ranges; must be registered before the app is ready.
+protocol.registerSchemesAsPrivileged([{ scheme: 'app-media', privileges: { standard: true, secure: true, stream: true } }])
+
+const videoTypes: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime'
+}
+
+// GET only; serves nothing but an existing regular video file on a drive-letter path. The real path is checked
+// too, so a link named .mp4, or one leading to a UNC/device path or an alternate data stream (a:b.mp4), is refused.
+async function serveVideo(request: Request): Promise<Response> {
+  if (request.method !== 'GET') return new Response(null, { status: 405 })
+  let path = ''
+  try {
+    path = decodeURIComponent(new URL(request.url).pathname.slice(1))
+  } catch {
+    /* fails the check below */
+  }
+  const local = /^[A-Za-z]:[\\/][^:]*$/
+  if (!local.test(path)) return new Response(null, { status: 403 })
+  const real = await realpath(path).catch(() => '')
+  const info = real && (await stat(real).catch(() => null))
+  if (!info || !info.isFile()) return new Response(null, { status: 404 })
+  const type = videoTypes[extname(real).toLowerCase()]
+  if (!type || !local.test(real)) return new Response(null, { status: 403 })
+
+  const size = info.size
+  const headers = { 'Content-Type': type, 'Accept-Ranges': 'bytes' }
+  const range = request.headers.get('range')
+  if (!range) {
+    const body = Readable.toWeb(createReadStream(real)) as ReadableStream
+    return new Response(body, { headers: { ...headers, 'Content-Length': String(size) } })
+  }
+  // One range: bytes=start-, bytes=start-end or bytes=-suffixLength.
+  const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
+  const start = !m || (!m[1] && !m[2]) ? NaN : m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]))
+  const end = m?.[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1
+  if (!(start <= end)) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } })
+  const body = Readable.toWeb(createReadStream(real, { start, end })) as ReadableStream
+  return new Response(body, {
+    status: 206,
+    headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1) }
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -100,6 +149,8 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  protocol.handle('app-media', serveVideo)
 
   ipcMain.handle('sessions:list', () => listSessions())
   ipcMain.handle('sessions:delete', (_, sessionId: unknown) => {
