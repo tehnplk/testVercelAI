@@ -308,24 +308,18 @@ function Sidebar({
                   {memoryIcon}
                   ความจำ
                 </button>
-                {/* Turning Guard off asks first; turning it on does not. */}
+                {/* Toggles at once both ways; the red "Guard ปิด" badge under the chat box is the reminder. */}
                 <button
                   role="menuitemcheckbox"
                   aria-checked={guard}
                   onClick={() => {
                     setMenuOpen(false)
-                    if (
-                      guard &&
-                      !confirm(
-                        'ปิด Guard? คำสั่งทุกอย่างของ Agent เช่น ลบไฟล์ หรือติดตั้งโปรแกรม จะรันทันทีโดยไม่ถาม (ยกเว้นการสั่งพิมพ์และการเพิ่ม skill)'
-                      )
-                    )
-                      return
                     onGuard(!guard)
                   }}
                 >
                   {shieldIcon(guard)}
-                  Guard: {guard ? 'เปิด' : 'ปิด'}
+                  Guard
+                  <span className="switch" aria-hidden="true" />
                 </button>
                 <button
                   role="menuitem"
