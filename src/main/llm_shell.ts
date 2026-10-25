@@ -67,6 +67,8 @@ app.on('will-quit', () => bskDaemon?.kill())
 
 type RunResult = { status: string; stdout: string; stderr: string }
 
+let bskQueue: Promise<unknown> = Promise.resolve()
+
 // Streams every chunk to onOutput as it arrives, and resolves with the full result.
 function run(command: string, cwd: string, timeoutSeconds: number, onOutput: (chunk: string) => void): Promise<RunResult> {
   return new Promise((resolve) => {
@@ -163,8 +165,13 @@ export function shellTools(approve: Approve, onOutput: OnOutput, request: string
         const dir = cwd ?? app.getPath('home')
         if (!(await approve('Bash', `${dir}\n$ ${command}`, toolCallId)))
           return 'The user denied this run. Do not retry it unless the user asks.'
-        if (/\bbsk\b/.test(command)) await ensureBskDaemon()
-        const result = await run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
+        const isBsk = /\bbsk\b/.test(command)
+        if (isBsk) await ensureBskDaemon()
+        const go = (): Promise<RunResult> => run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
+        // bsk allows one command per session at a time, so parallel bsk calls in one step must queue (run never rejects).
+        const next = isBsk ? bskQueue.then(go) : go()
+        if (isBsk) bskQueue = next
+        const result = await next
         // The chat shows a run's "Saved:"/"Result:" lines as its output; a run that printed none gets one
         // from the summary model, at the end of stdout where llm_memory.ts reads them.
         let stdout = tail(result.stdout)
