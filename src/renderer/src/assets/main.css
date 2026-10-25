@@ -443,7 +443,7 @@ body {
   height: 44px;
   padding: 0 16px;
   border-bottom: 1px solid var(--ev-c-gray-3);
-  background: var(--color-background-soft);
+  background: var(--color-background);
 }
 
 .chat-title {
@@ -480,9 +480,9 @@ body {
 
 .msg.user {
   align-self: flex-end;
-  border: 1px solid #45454a;
-  background: #1e1e21;
-  color: #e0e0e0;
+  border: 1px solid #3e4452;
+  background: #1d1f23;
+  color: #abb2bf;
 }
 
 .msg.user::selection,
@@ -492,6 +492,7 @@ body {
 
 .msg.assistant {
   align-self: flex-start;
+  border: 1px solid #3e4452;
   background: var(--color-background-mute);
   white-space: normal;
 }
@@ -516,15 +517,16 @@ body {
 .msg.assistant code {
   padding: 1px 4px;
   border-radius: 4px;
-  background: var(--color-background);
+  background: var(--color-background-soft);
   font-family: ui-monospace, Consolas, monospace;
   font-size: 90%;
 }
 
 .msg.assistant pre {
   padding: 8px 10px;
+  border: 1px solid var(--ev-c-gray-2);
   border-radius: 8px;
-  background: var(--color-background);
+  background: var(--color-background-soft);
   overflow-x: auto;
 }
 
@@ -758,8 +760,9 @@ body {
   overflow: auto;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #0c0c0c;
-  color: #cccccc;
+  border: 1px solid var(--ev-c-gray-2);
+  background: #1d1f23;
+  color: #abb2bf;
   font-family: Consolas, ui-monospace, monospace;
   font-size: 1em;
   white-space: pre-wrap;
@@ -996,7 +999,7 @@ body {
   gap: 6px 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--ev-c-gray-3);
-  background: var(--color-background-soft);
+  background: var(--color-background);
 }
 
 .composer-box {
@@ -1006,7 +1009,7 @@ body {
   padding: 0 4px;
   border-radius: 10px;
   border: 1px solid var(--ev-c-gray-2);
-  background: var(--color-background);
+  background: var(--color-background-soft);
 }
 
 .composer-box:focus-within {
@@ -1045,8 +1048,9 @@ body {
 }
 
 .msg.user .file-chip {
-  border-color: #45454a;
-  background: #2f2f33;
+  border-color: #3e4452;
+  background: #282c34;
+  color: #abb2bf;
 }
 
 .file-chip-name {
