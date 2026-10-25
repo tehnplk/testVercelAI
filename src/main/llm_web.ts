@@ -107,8 +107,8 @@ async function open(start: string, signal: AbortSignal): Promise<{ url: URL; res
   }
 }
 
-// The decompressed body, cut at maxBytes.
-async function readBody(res: IncomingMessage): Promise<{ body: Buffer; cut: boolean }> {
+// The decompressed body, cut at limit bytes.
+async function readBody(res: IncomingMessage, limit = maxBytes): Promise<{ body: Buffer; cut: boolean }> {
   const enc = res.headers['content-encoding']
   const unzip =
     enc === 'gzip' || enc === 'x-gzip' ? createGunzip() : enc === 'deflate' ? createInflate() : enc === 'br' ? createBrotliDecompress() : null
@@ -118,9 +118,9 @@ async function readBody(res: IncomingMessage): Promise<{ body: Buffer; cut: bool
   for await (const chunk of unzip ? res.pipe(unzip) : res) {
     chunks.push(chunk)
     size += chunk.length
-    if (size > maxBytes) {
+    if (size > limit) {
       res.destroy()
-      return { body: Buffer.concat(chunks).subarray(0, maxBytes), cut: true }
+      return { body: Buffer.concat(chunks).subarray(0, limit), cut: true }
     }
   }
   return { body: Buffer.concat(chunks), cut: false }
@@ -220,6 +220,28 @@ async function fetchPage(address: string, prompt: string | undefined, onUsage: O
         ? e.message || (e as NodeJS.ErrnoException).code || e.name
         : String(e)
     return `Fetch failed: ${reason}\nURL: ${address}`
+  }
+}
+
+const maxImageBytes = 10 * 1024 * 1024
+
+// An http(s) image as a data: URL, through the same address and redirect checks as webFetch. Throws when the
+// address is not public, the response is not image/*, it is over maxImageBytes or takes over 30 s.
+export async function fetchImage(address: string): Promise<string> {
+  const signal = AbortSignal.timeout(30_000)
+  try {
+    const { res } = await open(address, signal)
+    const status = res.statusCode ?? 0
+    const type = (res.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase()
+    if (status >= 400 || !/^image\/[\w.+-]+$/.test(type)) {
+      res.destroy()
+      throw new Error(status >= 400 ? `HTTP ${status}` : `not an image (${type || 'no content type'})`)
+    }
+    const { body, cut } = await readBody(res, maxImageBytes)
+    if (cut) throw new Error(`over ${maxImageBytes / 1024 / 1024} MB`)
+    return `data:${type};base64,${body.toString('base64')}`
+  } catch (e) {
+    throw signal.aborted ? new Error('timed out after 30 s') : e
   }
 }
 

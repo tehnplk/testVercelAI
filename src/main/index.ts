@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, dialog, ipcMain } from 'electron'
-import { join } from 'path'
+import { extname, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile, realpath, stat } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -11,7 +11,7 @@ import { shellTools } from './llm_shell'
 import { assessRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
 import { imageTools } from './llm_image'
-import { webTools } from './llm_web'
+import { fetchImage, webTools } from './llm_web'
 import { memoryPrompt, recallTools } from './llm_recall'
 import { randomUUID } from 'crypto'
 import {
@@ -136,6 +136,45 @@ app.whenReady().then(() => {
     if (!docx.test(real)) throw new Error('Invalid path')
     if (info.size > 50 * 1024 * 1024) return `ไฟล์ใหญ่เกิน 50 MB จึงเปิดดูในแอปไม่ได้: ${path}`
     return readFile(real)
+  })
+
+  // An image of an answer (![alt](src)) as a data: URL, which the page's CSP allows, or an error message.
+  // src comes from the model's text as react-markdown hands it on, percent-encoded (C:%5CUsers%5C...).
+  const imageTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml'
+  }
+  ipcMain.handle('image:load', async (_, src: unknown): Promise<{ src: string } | { error: string }> => {
+    if (typeof src !== 'string') throw new Error('Invalid src')
+    if (/^https?:\/\//i.test(src))
+      return fetchImage(src).then(
+        (data) => ({ src: data }),
+        // A failed connect can be an AggregateError with only a code (ETIMEDOUT, ECONNREFUSED).
+        (e) => ({
+          error: `โหลดรูปจากเว็บไม่ได้ (${e instanceof Error ? e.message || (e as NodeJS.ErrnoException).code || e.name : String(e)})`
+        })
+      )
+    let path = ''
+    try {
+      path = decodeURIComponent(src.replace(/^file:\/\/\//i, ''))
+    } catch {
+      /* not percent-encoded right; fails the check below */
+    }
+    // A drive-letter path only, so a UNC path (\\host\share) cannot make Windows connect to another machine.
+    if (!/^[A-Za-z]:[\\/]/.test(path)) return { error: 'ที่อยู่รูปต้องเป็น path เต็มในเครื่อง หรือ URL http(s)' }
+    // The real path is what gets read, so a link named .png cannot hand out another file.
+    const real = await realpath(path).catch(() => '')
+    const info = real && (await stat(real))
+    if (!info || !info.isFile()) return { error: 'ไม่พบไฟล์รูป' }
+    const type = imageTypes[extname(real).toLowerCase()]
+    if (!type) return { error: 'ไม่ใช่ไฟล์รูปที่รองรับ (png, jpg, gif, webp, bmp, svg)' }
+    if (info.size > 20 * 1024 * 1024) return { error: 'ไฟล์รูปใหญ่เกิน 20 MB' }
+    return { src: `data:${type};base64,${(await readFile(real)).toString('base64')}` }
   })
 
   // Full paths of the files the user picks to attach; empty when canceled.

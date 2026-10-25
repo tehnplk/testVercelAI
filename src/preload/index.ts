@@ -27,6 +27,7 @@ const api = {
   approve: (id: string, ok: boolean) => ipcRenderer.send('chat:approval', id, ok),
   openPath: (path: string) => ipcRenderer.invoke('file:open', path),
   readDocx: (path: string) => ipcRenderer.invoke('file:read-docx', path),
+  loadImage: (src: string) => ipcRenderer.invoke('image:load', src),
   pickFiles: () => ipcRenderer.invoke('file:pick'),
   onJev: (cb: (update: { id: string; status: 'inspecting' | 'safe' | 'risk' }) => void) => {
     const listener = (_: unknown, update: { id: string; status: 'inspecting' | 'safe' | 'risk' }): void => cb(update)
