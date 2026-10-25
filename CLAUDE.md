@@ -29,6 +29,7 @@ Electron + electron-vite + React 19 + TypeScript chat app. The agent uses the Ve
 - `src/main/llm_memory.ts`: PGlite store for sessions and full model messages.
 - `src/preload/`: `window.api` bridge and its types.
 - `src/renderer/src/`: `App.tsx`, `components/` (Sidebar, CodeBlock, FileLink), `assets/main.css`.
+- Icons: use `lucide-react` first; hand-drawn SVG only when Lucide has no fitting icon.
 
 ## Build and run
 
