@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Bookmark, Check, Pencil, Pin, Shield, ShieldOff, Trash, Trash2 } from 'lucide-react'
 import MemoryList from './MemoryList'
 
 const MIN_WIDTH = 180
@@ -45,58 +46,28 @@ const timeOf = (d: Date, days: number): string =>
         year: d.getFullYear() === new Date().getFullYear() ? undefined : '2-digit'
       })
 
-const trashIcon = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-  </svg>
-)
+const trashIcon = <Trash size={14} strokeWidth={2} aria-hidden="true" />
 
 // Filled while the chat is pinned.
 const pinIcon = (pinned: boolean): React.JSX.Element => (
-  <svg
-    viewBox="0 0 24 24"
-    width="14"
-    height="14"
-    fill={pinned ? 'currentColor' : 'none'}
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-  >
-    <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-  </svg>
+  <Pin size={14} strokeWidth={2} fill={pinned ? 'currentColor' : 'none'} aria-hidden="true" />
 )
 
-const pencilIcon = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-  </svg>
-)
+const pencilIcon = <Pencil size={14} strokeWidth={2} aria-hidden="true" />
 
-const checkIcon = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-)
+const checkIcon = <Check size={14} strokeWidth={2} aria-hidden="true" />
 
-// Profile menu icons (16px, Lucide bookmark, trash-2 and shield / shield-off).
-const shieldIcon = (on: boolean): React.JSX.Element => (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-    {!on && <path d="M2 2l20 20" />}
-  </svg>
-)
+// Profile menu icons (16px).
+const shieldIcon = (on: boolean): React.JSX.Element =>
+  on ? (
+    <Shield size={16} strokeWidth={1.75} aria-hidden="true" />
+  ) : (
+    <ShieldOff size={16} strokeWidth={1.75} aria-hidden="true" />
+  )
 
-const memoryIcon = (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
-  </svg>
-)
+const memoryIcon = <Bookmark size={16} strokeWidth={1.75} aria-hidden="true" />
 
-const clearIcon = (
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />
-  </svg>
-)
+const clearIcon = <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
 
 type Props = {
   sessions: Session[]

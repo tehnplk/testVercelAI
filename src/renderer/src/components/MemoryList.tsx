@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Trash } from 'lucide-react'
 
 // The agent's saved notes in a modal <dialog>, in ModelPicker's frame: Esc, a backdrop click or × close it.
 // Each note can be deleted; the agent no longer sees it from the next message on.
@@ -58,9 +59,7 @@ function MemoryList({ onClose }: { onClose: () => void }): React.JSX.Element {
               aria-label={`ลบความจำ ${n.content}`}
               title="ลบ"
             >
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-              </svg>
+              <Trash size={14} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         ))}

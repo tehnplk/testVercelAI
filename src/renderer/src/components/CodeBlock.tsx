@@ -1,20 +1,13 @@
 import { isValidElement, useMemo, useRef, useState } from 'react'
 import type { ExtraProps } from 'react-markdown'
+import { Check, Copy } from 'lucide-react'
 import { Chart, type ChartConfiguration } from 'chart.js/auto'
 import ChartView from './ChartView'
 
-const copyIcon = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <rect x="9" y="9" width="13" height="13" rx="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-)
+const copyIcon = <Copy size={14} strokeWidth={2} aria-hidden="true" />
 
-const checkIcon = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
-)
+const checkIcon = <Check size={14} strokeWidth={2} aria-hidden="true" />
+
 
 // The text of a ```chart block (the <code> react-markdown puts in the <pre>), or null for any other block.
 function chartSource(children: React.ReactNode): string | null {
