@@ -10,6 +10,9 @@ import Sidebar, { displayTitle } from './components/Sidebar'
 
 const components = { pre: CodeBlock, a: FileLink, img: MarkdownImage }
 
+// Markdown escapes raw HTML, so a <br> the model writes (e.g. in a table cell) would show as text: use a space instead.
+const noBr = (s: string): string => s.replace(/<br\s*\/?>/gi, ' ')
+
 // While an answer streams, a ```chart block whose JSON is not complete yet shows as code, without an error.
 function LiveCodeBlock(props: React.ComponentProps<'pre'> & ExtraProps): React.JSX.Element {
   return <CodeBlock {...props} live />
@@ -319,7 +322,7 @@ function App(): React.JSX.Element {
                   <>
                     {m.turn && <TurnInfo turn={m.turn} />}
                     <Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>
-                      {linkifyPaths(m.content)}
+                      {linkifyPaths(noBr(m.content))}
                     </Markdown>
                   </>
                 ) : (
@@ -344,7 +347,7 @@ function App(): React.JSX.Element {
                 ))}
                 {streamed && (
                   <Markdown remarkPlugins={[remarkGfm]} components={liveComponents} urlTransform={urlTransform}>
-                    {linkifyPaths(streamed)}
+                    {linkifyPaths(noBr(streamed))}
                   </Markdown>
                 )}
                 <div>
