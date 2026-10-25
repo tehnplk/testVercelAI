@@ -595,8 +595,15 @@ body {
   margin-top: 4px;
 }
 
+/* Live output of a tool call in progress, collapsed. */
+.tool-result {
+  font-size: 11px;
+  color: var(--ev-c-text-2);
+}
+
 /* "tool : input" on the left, +/- at the far right; the whole row toggles. */
-.turn summary {
+.turn summary,
+.tool-result summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -604,7 +611,8 @@ body {
   cursor: pointer;
 }
 
-.turn summary::-webkit-details-marker {
+.turn summary::-webkit-details-marker,
+.tool-result summary::-webkit-details-marker {
   display: none;
 }
 
@@ -616,18 +624,20 @@ body {
   white-space: nowrap;
 }
 
-.turn summary::after {
+.turn summary::after,
+.tool-result summary::after {
   content: '+';
   font-family: ui-monospace, Consolas, monospace;
   font-size: 13px;
 }
 
-.turn[open] > summary::after,
-.turn details[open] > summary::after {
+.turn details[open] > summary::after,
+.tool-result[open] > summary::after {
   content: '−';
 }
 
-.turn summary:focus-visible {
+.turn summary:focus-visible,
+.tool-result summary:focus-visible {
   outline: 2px solid #2f6fed;
   outline-offset: 1px;
 }
