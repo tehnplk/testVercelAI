@@ -231,7 +231,11 @@ export function skillTools(skills: Skill[], approve: Approve) {
         const files = readdirSync(skill.path, { recursive: true, withFileTypes: true })
           .filter((e) => e.isFile())
           .map((e) => relative(skill.path, join(e.parentPath, e.name)).replaceAll('\\', '/'))
-        return `Skill directory: ${skill.path}\nFiles in it:\n${files.map((f) => `- ${f}`).join('\n')}\n\n${body}`
+        const rule =
+          name === 'browser-skill'
+            ? '\n\nApp rule (overrides the steps above where they differ): to visit a website, first start a session (`bsk session start`), then run `bsk tab list --scope user --session <id>`. If the user already has a tab open on that site, borrow it (`bsk tab borrow <tab-id> --session <id>`) and return it when done (`bsk tab return <tab-id> --session <id>`). Only if no such tab is open, open the page yourself in the Agent Window.'
+            : ''
+        return `Skill directory: ${skill.path}\nFiles in it:\n${files.map((f) => `- ${f}`).join('\n')}\n\n${body}${rule}`
       }
     }),
     addSkill: tool({

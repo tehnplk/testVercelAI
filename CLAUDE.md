@@ -9,9 +9,13 @@ The main agent takes the user's request and spawns the coding agent that fits it
 
 Brief the agent with the goal, the files and what is known. When unsure, use sr.
 
-Run agents in parallel, one per independent task, each in its own git worktree (`isolation: "worktree"`). They commit on their branch and never push or merge; the main agent reviews each diff, merges into main, resolves conflicts, builds, tests the merged app, then removes the worktrees.
+Run agents in parallel, one per independent task, each in its own git worktree (`isolation: "worktree"`). They commit on their branch and never push or merge.
 
-Accept an agent's work only after testing it yourself: read the diff, run `npm run build`, and repeat the key checks on the real app (see Build and run). The agent's own report is not acceptance. Report to the user what you tested and what failed.
+Agents only develop; the main agent tests. Loop per task:
+1. The agent writes the change, runs `npm run build`, commits, and reports.
+2. The main agent reads the diff, merges into main, builds, and tests on the real app (see Build and run).
+3. On a bug, the main agent sends it back to the same agent (SendMessage) with the steps, what was expected and what happened; the agent fixes and commits on its branch; back to step 2.
+4. When it passes, the main agent removes the worktree and branch and reports to the user what was tested and what failed.
 
 ## Project
 

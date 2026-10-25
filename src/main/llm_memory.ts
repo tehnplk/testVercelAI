@@ -210,8 +210,11 @@ export async function loadModelMessages(sessionId: number): Promise<ModelMessage
     'SELECT role, content, message FROM messages WHERE session_id = $1 ORDER BY id',
     [sessionId]
   )
-  const all = rows.map((r) => withoutImages(r.message ?? ({ role: r.role, content: r.content } as ModelMessage)))
-  const starts = all.flatMap((m, i) => (m.role === 'user' ? [i] : []))
+  const stored = rows.map((r) => r.message ?? ({ role: r.role, content: r.content } as ModelMessage))
+  const starts = stored.flatMap((m, i) => (m.role === 'user' ? [i] : []))
+  // The current message, saved just before this load, keeps its attached images.
+  const current = starts[starts.length - 1]
+  const all = stored.map((m, i) => (i === current ? m : withoutImages(m)))
   const cut = starts.length > fullTurns ? starts[starts.length - fullTurns] : 0
   const old: ModelMessage[] = []
   for (const m of all.slice(0, cut))
@@ -221,32 +224,26 @@ export async function loadModelMessages(sessionId: number): Promise<ModelMessage
   return [...old, ...all.slice(cut)]
 }
 
-// An image a tool result showed (viewImage) is sent to the model only in the turn that viewed it;
-// later turns get a note instead. The stored row keeps the image.
+const seen = (part: object): { type: 'text'; text: string } => ({
+  type: 'text',
+  text: `[ภาพ ${('filename' in part && part.filename) || ''} ถูกส่งให้ดูแล้วใน turn ก่อน หากต้องดูอีกให้เรียก viewImage ใหม่]`
+})
+
+// An image a tool result showed (viewImage) or the user attached (llm_image.ts withAttachedImages) is sent
+// to the model only in its own turn; later turns get a note instead. The stored row keeps the image.
 const withoutImages = (m: ModelMessage): ModelMessage =>
-  m.role !== 'tool'
-    ? m
-    : {
-        ...m,
-        content: m.content.map((p) =>
-          p.type !== 'tool-result' || p.output.type !== 'content'
-            ? p
-            : {
-                ...p,
-                output: {
-                  ...p.output,
-                  value: p.output.value.map((v) =>
-                    v.type === 'text'
-                      ? v
-                      : {
-                          type: 'text' as const,
-                          text: `[ภาพ ${('filename' in v && v.filename) || ''} ถูกส่งให้ดูแล้วใน turn ก่อน หากต้องดูอีกให้เรียก viewImage ใหม่]`
-                        }
-                  )
-                }
-              }
-        )
-      }
+  m.role === 'user' && typeof m.content !== 'string'
+    ? { ...m, content: m.content.map((p) => (p.type === 'text' ? p : seen(p))) }
+    : m.role !== 'tool'
+      ? m
+      : {
+          ...m,
+          content: m.content.map((p) =>
+            p.type !== 'tool-result' || p.output.type !== 'content'
+              ? p
+              : { ...p, output: { ...p.output, value: p.output.value.map((v) => (v.type === 'text' ? v : seen(v))) } }
+          )
+        }
 
 // Tool-call and tool-result parts as stored in the message JSON.
 type Part = {

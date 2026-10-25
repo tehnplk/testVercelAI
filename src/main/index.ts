@@ -10,7 +10,7 @@ import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
 import { assessRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
-import { imageTools } from './llm_image'
+import { imageTools, splitAttachments, withAttachedImages } from './llm_image'
 import { fetchImage, webTools } from './llm_web'
 import { memoryPrompt, recallTools } from './llm_recall'
 import { randomUUID } from 'crypto'
@@ -42,6 +42,14 @@ function toolPurpose(toolCall: { input: unknown }): string | undefined {
   const purpose = (toolCall.input as { purpose?: unknown } | null)?.purpose
   return typeof purpose === 'string' && purpose ? purpose : undefined
 }
+
+// Model calls per message. The last one gets no tools and lastStepNote, so a reply always ends in an answer.
+const maxSteps = 20
+const lastStepNote = `
+
+This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).`
+// Saved and shown when the run still ends without text.
+const noAnswer = 'ขออภัย รอบนี้โมเดลไม่ได้เขียนคำตอบ ลองส่งข้อความให้ทำต่อ หรือแบ่งงานให้เล็กลง'
 
 function createWindow(): void {
   // Create the browser window.
@@ -209,10 +217,10 @@ app.whenReady().then(() => {
     if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
     if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
     if (!isAgentModel(model)) throw new Error('Invalid model')
-    // The renderer appends attached file paths after "\n\nไฟล์แนบ:\n"; they are not part of the title.
-    const id = sessionId ?? (await newSession(content.split('\n\nไฟล์แนบ:\n')[0].trim().slice(0, 60), model))
+    // Attached file paths are not part of the title.
+    const id = sessionId ?? (await newSession(splitAttachments(content).text.trim().slice(0, 60), model))
     const modelId = sessionId === null ? model : await sessionModel(id)
-    await saveMessages(id, [{ role: 'user', content }])
+    await saveMessages(id, [withAttachedImages(content)])
     // Stored after every agent step and Jev call, so a reply that fails halfway keeps what it spent,
     // and the header follows live. A provider that reports no count adds 0.
     const countUsage = async (u: Partial<TokenUsage>): Promise<void> =>
@@ -245,9 +253,10 @@ app.whenReady().then(() => {
     // Read on every message, so a skill folder added while the app runs is picked up, and notes saved in
     // another chat are known.
     const skills = discoverSkills()
+    const system = systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories())
     const result = streamText({
       model: agentModel(modelId),
-      system: systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories()),
+      system,
       tools: {
         // The summary model's tokens count as the agent's.
         ...shellTools(approve, toolOutput, content, (u) =>
@@ -259,7 +268,9 @@ app.whenReady().then(() => {
         // Web search fees are not tokens; only the tokens of its model and webFetch's helper are counted.
         ...webTools((u) => countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens }))
       },
-      stopWhen: isStepCount(20),
+      stopWhen: isStepCount(maxSteps),
+      prepareStep: ({ stepNumber }) =>
+        stepNumber === maxSteps - 1 ? { toolChoice: 'none', instructions: system + lastStepNote } : undefined,
       messages,
       onToolExecutionStart: ({ toolCall }) =>
         event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall), input: toolPurpose(toolCall) }),
@@ -274,8 +285,15 @@ app.whenReady().then(() => {
       if (part.type === 'text-delta') event.sender.send('chat:text', { delta: part.text })
       else if (part.type === 'error') throw part.error
     }
-    await saveMessages(id, await result.responseMessages)
-    return { sessionId: id, text: await result.text }
+    const response = await result.responseMessages
+    // An empty last step (the model wrote nothing) still leaves an answer in the chat.
+    let text = await result.text
+    if (!text.trim()) {
+      text = noAnswer
+      response.push({ role: 'assistant', content: text })
+    }
+    await saveMessages(id, response)
+    return { sessionId: id, text }
   })
 
   createWindow()

@@ -10,6 +10,9 @@ import Sidebar, { displayTitle } from './components/Sidebar'
 
 const components = { pre: CodeBlock, a: FileLink, img: MarkdownImage }
 
+// Markdown escapes raw HTML, so a <br> the model writes (e.g. in a table cell) would show as text: use a space instead.
+const noBr = (s: string): string => s.replace(/<br\s*\/?>/gi, ' ')
+
 // While an answer streams, a ```chart block whose JSON is not complete yet shows as code, without an error.
 function LiveCodeBlock(props: React.ComponentProps<'pre'> & ExtraProps): React.JSX.Element {
   return <CodeBlock {...props} live />
@@ -31,11 +34,13 @@ const ATTACH_HEAD = 'ไฟล์แนบ:\n'
 
 const baseName = (path: string): string => path.split(/[\\/]/).pop() || path
 
-// Splits a sent message into its text and the attached file paths (see send).
+// Splits a sent message into its text and the attached file paths (see send). Lines in [ ] are notes for the
+// model about an attached image (main llm_image.ts withAttachedImages), not files.
 function splitAttachments(content: string): { text: string; files: string[] } {
   const at = content.indexOf('\n\n' + ATTACH_HEAD)
   if (at < 0) return { text: content, files: [] }
-  return { text: content.slice(0, at), files: content.slice(at + 2 + ATTACH_HEAD.length).split('\n').filter(Boolean) }
+  const lines = content.slice(at + 2 + ATTACH_HEAD.length).split('\n')
+  return { text: content.slice(0, at), files: lines.filter((l) => l && !l.startsWith('[')) }
 }
 
 // A file shown by its name only; the full path is in the tooltip. Has a remove button when onRemove is given.
@@ -336,7 +341,7 @@ function App(): React.JSX.Element {
                   <>
                     {m.turn && <TurnInfo turn={m.turn} />}
                     <Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>
-                      {linkifyPaths(m.content)}
+                      {linkifyPaths(noBr(m.content))}
                     </Markdown>
                   </>
                 ) : (
@@ -375,7 +380,7 @@ function App(): React.JSX.Element {
                 )}
                 {streamed && (
                   <Markdown remarkPlugins={[remarkGfm]} components={liveComponents} urlTransform={urlTransform}>
-                    {linkifyPaths(streamed)}
+                    {linkifyPaths(noBr(streamed))}
                   </Markdown>
                 )}
                 <div>

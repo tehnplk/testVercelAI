@@ -1,6 +1,8 @@
 import { app } from 'electron'
-import { spawn } from 'child_process'
-import { existsSync } from 'fs'
+import { spawn, execFile, type ChildProcess } from 'child_process'
+import { closeSync, existsSync, openSync } from 'fs'
+import { homedir } from 'os'
+import { delimiter, join } from 'path'
 import { generateText, tool, type LanguageModelUsage } from 'ai'
 import { z } from 'zod'
 import { summaryModel } from './llm_model'
@@ -14,10 +16,54 @@ const bashPath = 'C:\\Program Files\\Git\\bin\\bash.exe'
 const maxOutput = 20000
 
 // Python called from bash: UTF-8 so Thai text survives, unbuffered so output streams line by line.
-const pythonEnv = { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' }
+// bsk clients use the daemon this file starts (ensureBskDaemon) instead of starting their own.
+const shellEnv = { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1', BSK_AUTO_START: '0' }
 
 const tail = (s: string): string =>
   s.length > maxOutput ? `...(cut ${s.length - maxOutput} chars)\n${s.slice(-maxOutput)}` : s
+
+// bsk (browser-skill) cannot start its own background daemon when the app runs inside a Windows Job Object
+// that forbids breakaway (one set by whatever launched it, e.g. a terminal or IDE). The app owns one
+// `bsk daemon start --foreground` instead, started on the first command that uses bsk.
+let bskDaemon: ChildProcess | null = null
+let bskStarting: Promise<void> | null = null
+
+const findBsk = (): string | undefined =>
+  [...(process.env.PATH ?? '').split(delimiter), join(homedir(), '.local', 'bin')]
+    .map((dir) => join(dir, 'bsk.exe'))
+    .find((p) => existsSync(p))
+
+const bskUp = (bsk: string): Promise<boolean> =>
+  new Promise((resolve) =>
+    execFile(bsk, ['status', '--json'], { env: { ...process.env, BSK_AUTO_START: '0' }, windowsHide: true, timeout: 5000 }, (e) =>
+      resolve(!e)
+    )
+  )
+
+// Starts the daemon unless bsk is missing or a daemon already answers, and waits up to 10s for it.
+async function startBskDaemon(): Promise<void> {
+  const bsk = findBsk()
+  if (!bsk || (await bskUp(bsk))) return
+  const log = openSync(join(app.getPath('userData'), 'bsk-daemon.log'), 'a')
+  // Not detached: it needs no breakaway, and the app's job ends it if the app dies without will-quit.
+  const daemon = spawn(bsk, ['daemon', 'start', '--foreground'], { stdio: ['ignore', log, log], windowsHide: true })
+  closeSync(log)
+  bskDaemon = daemon
+  const gone = (): void => {
+    if (bskDaemon === daemon) bskDaemon = null
+  }
+  daemon.on('exit', gone)
+  daemon.on('error', gone)
+  for (let i = 0; i < 50 && bskDaemon === daemon && !(await bskUp(bsk)); i++)
+    await new Promise((r) => setTimeout(r, 200))
+}
+
+function ensureBskDaemon(): Promise<void> {
+  if (!bskStarting && !bskDaemon) bskStarting = startBskDaemon().finally(() => (bskStarting = null))
+  return bskStarting ?? Promise.resolve()
+}
+
+app.on('will-quit', () => bskDaemon?.kill())
 
 type RunResult = { status: string; stdout: string; stderr: string }
 
@@ -34,7 +80,7 @@ function run(command: string, cwd: string, timeoutSeconds: number, onOutput: (ch
       clearTimeout(timer)
       resolve({ status, stdout, stderr })
     }
-    const child = spawn(bashPath, ['-c', command], { cwd, env: { ...process.env, ...pythonEnv }, windowsHide: true })
+    const child = spawn(bashPath, ['-c', command], { cwd, env: { ...process.env, ...shellEnv }, windowsHide: true })
     // child.kill() would leave grandchildren (e.g. ping under bash) running on Windows.
     const timer = setTimeout(() => {
       timedOut = true
@@ -117,6 +163,7 @@ export function shellTools(approve: Approve, onOutput: OnOutput, request: string
         const dir = cwd ?? app.getPath('home')
         if (!(await approve('Bash', `${dir}\n$ ${command}`, toolCallId)))
           return 'The user denied this run. Do not retry it unless the user asks.'
+        if (/\bbsk\b/.test(command)) await ensureBskDaemon()
         const result = await run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
         // The chat shows a run's "Saved:"/"Result:" lines as its output; a run that printed none gets one
         // from the summary model, at the end of stdout where llm_memory.ts reads them.

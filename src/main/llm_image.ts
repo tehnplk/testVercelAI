@@ -1,16 +1,69 @@
-import { nativeImage } from 'electron'
-import { basename } from 'path'
+import { nativeImage, type NativeImage } from 'electron'
+import { basename, extname } from 'path'
 import { existsSync } from 'fs'
-import { tool } from 'ai'
+import { tool, type UserModelMessage } from 'ai'
 import { z } from 'zod'
 
 // Long side in pixels; a bigger image costs more tokens without reading better.
 const maxSide = 1568
 // Smallest region side in pixels; a smaller crop is grown around its centre.
 const minRegion = 32
+// Attached images sent with one message; more are left for viewImage.
+const maxAttached = 5
+const imageExt = /^\.(png|jpe?g|webp|gif|bmp)$/i
+// The renderer (App.tsx send) appends attached file paths, one per line, after this.
+const attachHead = '\n\nไฟล์แนบ:\n'
 
 type Region = { x: number; y: number; width: number; height: number }
 type Viewed = { file: string; text: string; data: string }
+
+// The typed text and the attached file paths of a user message.
+export function splitAttachments(content: string): { text: string; files: string[] } {
+  const at = content.indexOf(attachHead)
+  if (at < 0) return { text: content, files: [] }
+  return { text: content.slice(0, at), files: content.slice(at + attachHead.length).split('\n').filter(Boolean) }
+}
+
+// The image shrunk to maxSide on its long side; one side given keeps the aspect ratio.
+function fit(image: NativeImage): NativeImage {
+  const { width, height } = image.getSize()
+  if (Math.max(width, height) <= maxSide) return image
+  return image.resize(width >= height ? { width: maxSide, quality: 'best' } : { height: maxSide, quality: 'best' })
+}
+
+// The user message with its attached images as image parts, so the model sees them without viewImage.
+// The text keeps every path, so the agent can still work on the files. An image that cannot be sent gets a
+// note line instead, starting with a newline so the chat does not show it as an attached file (App.tsx).
+// All agentModels (llm_model.ts) take images; a model without image input would need a check here.
+// llm_memory.ts swaps the images for a note in later turns.
+export function withAttachedImages(content: string): UserModelMessage {
+  const images = splitAttachments(content).files.filter((f) => imageExt.test(extname(f)))
+  if (!images.length) return { role: 'user', content }
+  return {
+    role: 'user',
+    content: [
+      { type: 'text', text: content },
+      ...images.map((path, i) => {
+        const file = basename(path)
+        if (i >= maxAttached)
+          return { type: 'text' as const, text: `\n[ภาพ ${file} ไม่ได้ส่งให้ดู (แนบเกิน ${maxAttached} ภาพ) หากต้องดูให้เรียก viewImage]` }
+        const image = existsSync(path) ? nativeImage.createFromPath(path) : nativeImage.createEmpty()
+        if (image.isEmpty())
+          return {
+            type: 'text' as const,
+            text: `\n[ภาพ ${file} ส่งให้ดูไม่ได้: ไม่พบไฟล์ เสีย หรือไม่ใช่ PNG/JPEG หากต้องดูให้แปลงเป็น PNG ด้วย Bash แล้วเรียก viewImage]`
+          }
+        return {
+          type: 'file' as const,
+          mediaType: 'image/jpeg',
+          // llm_memory.ts names the image by this in later turns.
+          filename: file,
+          data: { type: 'data' as const, data: fit(image).toJPEG(85).toString('base64') }
+        }
+      })
+    ]
+  }
+}
 
 // Start and length in pixels of one side of a region: cut to the image, at least minRegion long.
 function span(start: number, size: number, full: number): [number, number] {
@@ -68,10 +121,7 @@ export const imageTools = {
         image = image.crop({ x: left, y: top, width, height })
         text += `, region x=${left} y=${top} ${width}x${height} px`
       }
-      const { width, height } = image.getSize()
-      // One side given keeps the aspect ratio.
-      if (Math.max(width, height) > maxSide)
-        image = image.resize(width >= height ? { width: maxSide, quality: 'best' } : { height: maxSide, quality: 'best' })
+      image = fit(image)
       const size = image.getSize()
       text += `, returned ${size.width}x${size.height} px`
       return { file, text, data: image.toJPEG(85).toString('base64') }
