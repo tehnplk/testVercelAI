@@ -210,9 +210,39 @@ body {
   color: #ef5350;
 }
 
+/* Rename mode: the input fills the row and the check button sits at its right end. */
+.session:has(.session-rename) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+}
+
+.session-save {
+  flex-shrink: 0;
+  display: flex;
+  padding: 5px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  cursor: pointer;
+}
+
+.session-save:hover {
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.session-save:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: -2px;
+}
+
 /* Same height as the row's button: its 8px padding less the 1px border. */
 .session-rename {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 34px;
   padding: 7px 9px;
   border: 1px solid #2f6fed;
@@ -651,9 +681,11 @@ body {
   margin-bottom: 16px;
 }
 
+/* Wraps so the model badge (.composer-footer) takes its own row under the box. */
 .composer {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--ev-c-gray-3);
   background: var(--color-background-soft);
@@ -779,4 +811,126 @@ body {
 .composer button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.composer-footer {
+  flex-basis: 100%;
+  display: flex;
+}
+
+.composer .model-badge {
+  padding: 2px 10px;
+  border: 1px solid var(--ev-c-gray-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  font-size: 11px;
+}
+
+.composer .model-badge:hover:not(:disabled) {
+  background: var(--color-background-mute);
+  color: var(--color-text);
+}
+
+.composer .model-badge:focus-visible {
+  outline: 2px solid #2f6fed;
+}
+
+/* Model picker: a small dialog with the same frame as the .docx viewer. */
+.model-picker {
+  width: calc(100vw - 32px);
+  max-width: 480px;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ev-c-gray-2);
+  border-radius: 10px;
+  background: var(--color-background-soft);
+  color: var(--color-text);
+}
+
+.model-picker::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.model-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--ev-c-gray-3);
+}
+
+.model-picker-close {
+  padding: 2px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.model-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.model-option-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.model-option-name small {
+  font-size: 11px;
+  color: var(--ev-c-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-option-price {
+  flex-shrink: 0;
+  color: var(--ev-c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.model-option-check {
+  flex-shrink: 0;
+  width: 1em;
+  color: #6ea8fe;
+}
+
+.model-picker-close:hover,
+.model-option:hover {
+  background: var(--color-background-mute);
+}
+
+.model-option.current {
+  background: rgba(47, 111, 237, 0.25);
+}
+
+.model-picker-close:focus-visible,
+.model-option:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: -2px;
 }

@@ -7,8 +7,11 @@ const api = {
   deleteSession: (sessionId: number) => ipcRenderer.invoke('sessions:delete', sessionId),
   renameSession: (sessionId: number, title: string) => ipcRenderer.invoke('sessions:rename', sessionId, title),
   pinSession: (sessionId: number, pinned: boolean) => ipcRenderer.invoke('sessions:pin', sessionId, pinned),
+  setSessionModel: (sessionId: number, model: string) => ipcRenderer.invoke('sessions:set-model', sessionId, model),
+  models: () => ipcRenderer.invoke('models:list'),
   history: (sessionId: number) => ipcRenderer.invoke('chat:history', sessionId),
-  send: (sessionId: number | null, content: string) => ipcRenderer.invoke('chat:send', sessionId, content),
+  send: (sessionId: number | null, content: string, model: string) =>
+    ipcRenderer.invoke('chat:send', sessionId, content, model),
   onTool: (cb: (event: { id: string; name: string; running: boolean }) => void) => {
     const listener = (_: unknown, event: { id: string; name: string; running: boolean }): void => cb(event)
     ipcRenderer.on('chat:tool', listener)

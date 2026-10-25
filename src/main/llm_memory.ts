@@ -17,6 +17,8 @@ export type Session = {
   id: number
   title: string
   pinned: boolean
+  // Agent model id; null for the default.
+  model: string | null
   createdAt: Date
   updatedAt: Date
   agentInputTokens: number | null
@@ -70,6 +72,8 @@ async function migrate(): Promise<void> {
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_input_tokens int;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS guard_output_tokens int;
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;
+    -- Agent model id (llm_model.ts agentModels); NULL: the default.
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS model text;
   `)
   // Messages from before sessions existed go into one session.
   const orphans = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM messages WHERE session_id IS NULL')
@@ -85,21 +89,24 @@ const textOf = (m: ModelMessage): string =>
     ? m.content
     : m.content.map((part) => (part.type === 'text' ? part.text : '')).join('')
 
-async function createSession(title: string): Promise<number> {
-  const { rows } = await db.query<{ id: number }>('INSERT INTO sessions (title) VALUES ($1) RETURNING id', [title])
+async function createSession(title: string, model: string | null = null): Promise<number> {
+  const { rows } = await db.query<{ id: number }>('INSERT INTO sessions (title, model) VALUES ($1, $2) RETURNING id', [
+    title,
+    model
+  ])
   return rows[0].id
 }
 
-export async function newSession(title: string): Promise<number> {
+export async function newSession(title: string, model: string): Promise<number> {
   await ready
-  return createSession(title)
+  return createSession(title, model)
 }
 
 // Newest first by last message time; an empty session counts from its creation.
 export async function listSessions(): Promise<Session[]> {
   await ready
   const { rows } = await db.query<Session>(`
-    SELECT s.id, s.title, s.pinned, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
+    SELECT s.id, s.title, s.pinned, s.model, s.created_at AS "createdAt", coalesce(max(m.created_at), s.created_at) AS "updatedAt",
       s.agent_input_tokens AS "agentInputTokens", s.agent_output_tokens AS "agentOutputTokens",
       s.guard_input_tokens AS "guardInputTokens", s.guard_output_tokens AS "guardOutputTokens"
     FROM sessions s LEFT JOIN messages m ON m.session_id = s.id
@@ -134,6 +141,18 @@ export async function renameSession(sessionId: number, title: string): Promise<v
 export async function setPinned(sessionId: number, pinned: boolean): Promise<void> {
   await ready
   await db.query('UPDATE sessions SET pinned = $2 WHERE id = $1', [sessionId, pinned])
+}
+
+export async function setSessionModel(sessionId: number, model: string): Promise<void> {
+  await ready
+  await db.query('UPDATE sessions SET model = $2 WHERE id = $1', [sessionId, model])
+}
+
+// null for the default, or when there is no such session.
+export async function sessionModel(sessionId: number): Promise<string | null> {
+  await ready
+  const { rows } = await db.query<{ model: string | null }>('SELECT model FROM sessions WHERE id = $1', [sessionId])
+  return rows[0]?.model ?? null
 }
 
 export async function deleteSession(sessionId: number): Promise<void> {
@@ -241,6 +260,14 @@ function shown(name: string, result: Part | undefined): Pick<ToolCall, 'output' 
         : JSON.stringify(o.value ?? o)
   if (o.type === 'execution-denied' || (name === 'Bash' && text.startsWith('The user denied this run')))
     return { output: 'ถูกปฏิเสธ', files: [], console: cap(text) }
+  // webSearch and webFetch (llm_web.ts): the first line (result count or page title) is the output, the console
+  // keeps the start, and paths in a web page never become file links.
+  if (name === 'webSearch' || name === 'webFetch')
+    return {
+      output: text.split('\n')[0].slice(0, 200),
+      files: [],
+      console: text.length > maxShown ? `${text.slice(0, maxShown)}\n...(cut ${text.length - maxShown} chars)` : text
+    }
   // Bash's result: status line, then stdout and stderr under their headers (see llm_shell.ts).
   const run = name === 'Bash' ? text.match(/^(.*)\n--- stdout ---\n([\s\S]*)\n--- stderr ---\n([\s\S]*)$/) : null
   const [, status, stdout, stderr] = run ?? ['', 'exit code 0', text, '']

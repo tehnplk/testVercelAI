@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
 import DocxViewer from './components/DocxViewer'
 import FileLink, { linkifyPaths, OPEN, ViewDocx } from './components/FileLink'
+import ModelPicker from './components/ModelPicker'
 import Sidebar, { displayTitle } from './components/Sidebar'
 
 const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
@@ -161,6 +162,10 @@ function App(): React.JSX.Element {
   // Path of the .docx file open in the viewer. Kept here, so the viewer stays open when the reply
   // whose link opened it is replaced by its stored copy.
   const [docx, setDocx] = useState<string | null>(null)
+  const [models, setModels] = useState<AgentModel[]>([])
+  // Model picked for a chat not sent yet; null for the default. Stored on the session its first message creates.
+  const [newModel, setNewModel] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
   const bottom = useRef<HTMLDivElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const opening = useRef<number | null>(null)
@@ -190,7 +195,19 @@ function App(): React.JSX.Element {
     setSessions((list) => list.map((s) => (s.id === id ? { ...s, pinned } : s)))
   }
 
+  const session = sessions.find((s) => s.id === sessionId)
+  const modelId = (sessionId === null ? newModel : session?.model) ?? models[0]?.id
+  const modelLabel = models.find((m) => m.id === modelId)?.label ?? modelId
+
+  // An open chat stores the model for its next message; a new chat keeps it until its first.
+  const pickModel = async (id: string): Promise<void> => {
+    if (sessionId === null) return setNewModel(id)
+    await window.api.setSessionModel(sessionId, id)
+    setSessions((list) => list.map((s) => (s.id === sessionId ? { ...s, model: id } : s)))
+  }
+
   useEffect(() => {
+    window.api.models().then(setModels)
     window.api.sessions().then((list) => {
       setSessions(list)
       if (list[0]) openSession(list[0].id)
@@ -243,7 +260,7 @@ function App(): React.JSX.Element {
   const send = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     const text = input.trim()
-    if (!text || pending) return
+    if (!text || pending || !modelId) return
     // The model gets the full paths; the chat bubble turns them back into chips (splitAttachments).
     const content = attachments.length ? text + '\n\n' + ATTACH_HEAD + attachments.join('\n') : text
     setInput('')
@@ -256,7 +273,7 @@ function App(): React.JSX.Element {
     setStreamed('')
     setMessages((m) => [...m, { role: 'user', content }])
     try {
-      const reply = await window.api.send(sessionId, content)
+      const reply = await window.api.send(sessionId, content, modelId)
       opening.current = reply.sessionId
       setSessionId(reply.sessionId)
       // Reloaded from the store, so the reply shows its skills and tool calls as a reopened chat does.
@@ -282,7 +299,7 @@ function App(): React.JSX.Element {
           onPin={pinSession}
         />
         <div className="chat">
-          <ChatHeader session={sessions.find((s) => s.id === sessionId)} />
+          <ChatHeader session={session} />
           <main className="messages">
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.role}`}>
@@ -328,7 +345,7 @@ function App(): React.JSX.Element {
             {approval && (
               <div className="approval">
                 <div className="approval-title">Agent ขออนุญาตรัน {approval.tool}</div>
-                <div className="risk">🔴 Guard ประเมินว่า risk: {approval.risk.reason}</div>
+                {approval.risk && <div className="risk">🔴 Guard ประเมินว่า risk: {approval.risk.reason}</div>}
                 <pre>{approval.detail}</pre>
                 <div className="approval-actions">
                   <button className="run" onClick={() => answer(true)}>
@@ -385,10 +402,26 @@ function App(): React.JSX.Element {
             <button type="submit" disabled={pending || !input.trim()}>
               ส่ง
             </button>
+            {modelId && (
+              <div className="composer-footer">
+                <button
+                  type="button"
+                  className="model-badge"
+                  title="เปลี่ยนโมเดล"
+                  disabled={pending}
+                  onClick={() => setPicking(true)}
+                >
+                  {modelLabel}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>
       {docx && <DocxViewer path={docx} onClose={() => setDocx(null)} />}
+      {picking && modelId && (
+        <ModelPicker models={models} current={modelId} onPick={pickModel} onClose={() => setPicking(false)} />
+      )}
     </ViewDocx.Provider>
   )
 }

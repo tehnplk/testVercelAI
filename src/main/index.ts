@@ -5,12 +5,13 @@ import { readFile, realpath, stat } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { isStepCount, streamText } from 'ai'
-import { model } from './llm_model'
+import { agentModel, agentModels, isAgentModel } from './llm_model'
 import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
-import { assessRisk } from './llm_risk'
+import { assessRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
 import { imageTools } from './llm_image'
+import { webTools } from './llm_web'
 import { randomUUID } from 'crypto'
 import {
   addUsage,
@@ -21,7 +22,9 @@ import {
   newSession,
   renameSession,
   saveMessages,
+  sessionModel,
   setPinned,
+  setSessionModel,
   type TokenUsage
 } from './llm_memory'
 
@@ -46,6 +49,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -93,6 +97,13 @@ app.whenReady().then(() => {
     if (typeof pinned !== 'boolean') throw new Error('Invalid pinned')
     return setPinned(sessionId as number, pinned)
   })
+  // The next message of the session uses this model.
+  ipcMain.handle('sessions:set-model', (_, sessionId: unknown, model: unknown) => {
+    if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
+    if (!isAgentModel(model)) throw new Error('Invalid model')
+    return setSessionModel(sessionId as number, model)
+  })
+  ipcMain.handle('models:list', () => agentModels)
 
   // Files that would run when opened are shown in Explorer instead.
   const runnable = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|lnk|scr|hta|reg|jar|py|pyw|sh|cpl)$/i
@@ -139,12 +150,15 @@ app.whenReady().then(() => {
     approvals.delete(requestId)
   })
 
-  // sessionId null starts a new session, titled by its first message.
-  ipcMain.handle('chat:send', async (event, sessionId: unknown, content: unknown) => {
+  // sessionId null starts a new session, titled by its first message and using model; an existing session
+  // keeps its own model (sessions:set-model changes it).
+  ipcMain.handle('chat:send', async (event, sessionId: unknown, content: unknown, model: unknown) => {
     if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
     if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
+    if (!isAgentModel(model)) throw new Error('Invalid model')
     // The renderer appends attached file paths after "\n\nไฟล์แนบ:\n"; they are not part of the title.
-    const id = sessionId ?? (await newSession(content.split('\n\nไฟล์แนบ:\n')[0].trim().slice(0, 60)))
+    const id = sessionId ?? (await newSession(content.split('\n\nไฟล์แนบ:\n')[0].trim().slice(0, 60), model))
+    const modelId = sessionId === null ? model : await sessionModel(id)
     await saveMessages(id, [{ role: 'user', content }])
     // Stored after every agent step and Jev call, so a reply that fails halfway keeps what it spent,
     // and the header follows live. A provider that reports no count adds 0.
@@ -156,19 +170,21 @@ app.whenReady().then(() => {
       event.sender.send('chat:tool-output', { id: toolCallId, chunk })
     // Commands run so far for this message; Jev uses them to tell files this task made from the user's own.
     const ran: string[] = []
+    const ask = (tool: string, detail: string, risk: Risk | null): Promise<boolean> =>
+      new Promise<boolean>((resolve) => {
+        const requestId = randomUUID()
+        approvals.set(requestId, resolve)
+        event.sender.send('chat:approve', { id: requestId, tool, detail, risk })
+      })
     // Jev judges the run first: SAFE runs at once, RISK shows the approval card.
-    const approve = async (tool: string, detail: string, toolCallId: string): Promise<boolean> => {
+    // alwaysAsk (addSkill) shows the card without Guard, and the card has no Guard line.
+    const approve = async (tool: string, detail: string, toolCallId: string, alwaysAsk = false): Promise<boolean> => {
+      if (alwaysAsk) return ask(tool, detail, null)
       event.sender.send('chat:jev', { id: toolCallId, status: 'inspecting' })
       const { risk, usage } = await assessRisk(tool, detail, ran)
       await countUsage({ guardInput: usage?.inputTokens, guardOutput: usage?.outputTokens })
       event.sender.send('chat:jev', { id: toolCallId, status: risk.level })
-      const ok =
-        risk.level === 'safe' ||
-        (await new Promise<boolean>((resolve) => {
-          const requestId = randomUUID()
-          approvals.set(requestId, resolve)
-          event.sender.send('chat:approve', { id: requestId, tool, detail, risk })
-        }))
+      const ok = risk.level === 'safe' || (await ask(tool, detail, risk))
       if (ok) ran.push(detail)
       return ok
     }
@@ -176,15 +192,17 @@ app.whenReady().then(() => {
     // Read on every message, so a skill folder added while the app runs is picked up.
     const skills = discoverSkills()
     const result = streamText({
-      model,
+      model: agentModel(modelId),
       system: systemPrompt + skillsPrompt(skills),
       tools: {
         // The summary model's tokens count as the agent's.
         ...shellTools(approve, toolOutput, content, (u) =>
           countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens })
         ),
-        ...skillTools(skills),
-        ...imageTools
+        ...skillTools(skills, approve),
+        ...imageTools,
+        // Web search fees are not tokens; only the tokens of its model and webFetch's helper are counted.
+        ...webTools((u) => countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens }))
       },
       stopWhen: isStepCount(20),
       messages,

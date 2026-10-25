@@ -13,6 +13,8 @@ declare global {
     id: number
     title: string
     pinned: boolean
+    // Agent model id; null for the default.
+    model: string | null
     createdAt: Date
     updatedAt: Date
     agentInputTokens: number | null
@@ -26,8 +28,11 @@ declare global {
   >
   type Risk ={ level: 'safe' | 'risk'; reason: string }
   type JevStatus = 'inspecting' | Risk['level']
-  type ApprovalRequest = { id: string; tool: string; detail: string; risk: Risk }
+  // risk is null for tools that always ask without Guard (addSkill).
+  type ApprovalRequest = { id: string; tool: string; detail: string; risk: Risk | null }
   type ToolEvent = { id: string; name: string; running: boolean; skill?: string }
+  // An entry of agentModels in src/main/llm_model.ts; prices are US$ per 1M tokens.
+  type AgentModel = { id: string; label: string; input: number; output: number }
 
   interface Window {
     electron: ElectronAPI
@@ -37,8 +42,13 @@ declare global {
       /** The title is trimmed and must be 1 to 200 characters. */
       renameSession: (sessionId: number, title: string) => Promise<void>
       pinSession: (sessionId: number, pinned: boolean) => Promise<void>
+      /** The model must be one of models(); the session's next message uses it. */
+      setSessionModel: (sessionId: number, model: string) => Promise<void>
+      /** The agent models to pick from; the first is the default. */
+      models: () => Promise<AgentModel[]>
       history: (sessionId: number) => Promise<ChatMessage[]>
-      send: (sessionId: number | null, content: string) => Promise<{ sessionId: number; text: string }>
+      /** model (one of models()) is stored on a new session; an existing session uses its own. */
+      send: (sessionId: number | null, content: string, model: string) => Promise<{ sessionId: number; text: string }>
       onTool: (cb: (event: ToolEvent) => void) => () => void
       onApprove: (cb: (request: ApprovalRequest) => void) => () => void
       approve: (id: string, ok: boolean) => void

@@ -5,7 +5,8 @@ import { generateText, tool, type LanguageModelUsage } from 'ai'
 import { z } from 'zod'
 import { summaryModel } from './llm_model'
 
-export type Approve = (tool: string, detail: string, toolCallId: string) => Promise<boolean>
+// alwaysAsk skips Guard and shows the approval card every time.
+export type Approve = (tool: string, detail: string, toolCallId: string, alwaysAsk?: boolean) => Promise<boolean>
 export type OnOutput = (toolCallId: string, chunk: string) => void
 export type OnUsage = (usage: LanguageModelUsage) => Promise<void>
 

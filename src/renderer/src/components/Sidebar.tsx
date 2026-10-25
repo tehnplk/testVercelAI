@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
 
 const MIN_WIDTH = 180
-const MAX_WIDTH = 480
 const COLLAPSE_BELOW = 120
-const DEFAULT_WIDTH = 240
+const STORAGE_KEY = 'sidebar.v2'
+
+// Max is half the screen width; the default starts at a quarter of it.
+const maxWidth = (): number => Math.max(MIN_WIDTH, Math.round(window.screen.width * 0.5))
+const defaultWidth = (): number => Math.min(maxWidth(), Math.max(MIN_WIDTH, Math.round(window.screen.width * 0.25)))
 
 type Layout = { width: number; collapsed: boolean }
 
 function loadLayout(): Layout {
   try {
-    const saved = JSON.parse(localStorage.getItem('sidebar') ?? '')
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '')
     if (typeof saved.width === 'number' && typeof saved.collapsed === 'boolean') return saved
   } catch {
     // no saved layout
   }
-  return { width: DEFAULT_WIDTH, collapsed: false }
+  return { width: defaultWidth(), collapsed: false }
 }
 
 // ponytail: folder names may contain spaces, so a later "/" in the same title can be swallowed into a Windows path.
@@ -68,6 +71,12 @@ const pencilIcon = (
   </svg>
 )
 
+const checkIcon = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
 type Props = {
   sessions: Session[]
   sessionId: number | null
@@ -100,23 +109,35 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
       <div key={s.id} className={s.id === sessionId ? 'session active' : 'session'}>
         {renaming === s.id ? (
           // Enter or blur saves; Esc puts the old title back first, so the save is skipped. Empty cancels too.
-          <input
-            className="session-rename"
-            defaultValue={s.title}
-            maxLength={200}
-            autoFocus
-            aria-label="ชื่อแชต"
-            onFocus={(e) => e.currentTarget.select()}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') e.currentTarget.value = s.title
-              if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
-            }}
-            onBlur={(e) => {
-              const t = e.currentTarget.value.trim()
-              if (t && t !== s.title) onRename(s.id, t)
-              setRenaming(null)
-            }}
-          />
+          // The check button only blurs the input, so blur stays the single save point.
+          <>
+            <input
+              className="session-rename"
+              defaultValue={s.title}
+              maxLength={200}
+              autoFocus
+              aria-label="ชื่อแชต"
+              onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') e.currentTarget.value = s.title
+                if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur()
+              }}
+              onBlur={(e) => {
+                const t = e.currentTarget.value.trim()
+                if (t && t !== s.title) onRename(s.id, t)
+                setRenaming(null)
+              }}
+            />
+            <button
+              className="session-save"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => (e.currentTarget.previousElementSibling as HTMLInputElement).blur()}
+              aria-label="บันทึกชื่อ"
+              title="บันทึกชื่อ"
+            >
+              {checkIcon}
+            </button>
+          </>
         ) : (
           <>
             <button
@@ -163,7 +184,7 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
 
   useEffect(() => {
     try {
-      localStorage.setItem('sidebar', JSON.stringify(layout))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
     } catch {
       // storage unavailable; layout just isn't remembered
     }
@@ -179,7 +200,7 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
     setLayout((l) =>
       x < COLLAPSE_BELOW
         ? { ...l, collapsed: true }
-        : { width: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, x)), collapsed: false }
+        : { width: Math.min(maxWidth(), Math.max(MIN_WIDTH, x)), collapsed: false }
     )
   }
 
