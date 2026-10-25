@@ -37,6 +37,12 @@ function skillName(toolCall: { toolName: string; input: unknown }): string | und
   return toolCall.toolName === 'loadSkill' && typeof name === 'string' ? name : undefined
 }
 
+// What the call is for (Bash's purpose), same text the saved turn shows (llm_memory.ts).
+function toolPurpose(toolCall: { input: unknown }): string | undefined {
+  const purpose = (toolCall.input as { purpose?: unknown } | null)?.purpose
+  return typeof purpose === 'string' && purpose ? purpose : undefined
+}
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -256,9 +262,9 @@ app.whenReady().then(() => {
       stopWhen: isStepCount(20),
       messages,
       onToolExecutionStart: ({ toolCall }) =>
-        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall) }),
+        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall), input: toolPurpose(toolCall) }),
       onToolExecutionEnd: ({ toolCall }) =>
-        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false, skill: skillName(toolCall) }),
+        event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false, skill: skillName(toolCall), input: toolPurpose(toolCall) }),
       // Per step only; the all-steps total (result.usage) is not added again.
       onStepEnd: ({ usage }) => countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
     })

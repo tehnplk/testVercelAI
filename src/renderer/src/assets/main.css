@@ -622,6 +622,7 @@ body {
   font-size: 13px;
 }
 
+.turn[open] > summary::after,
 .turn details[open] > summary::after {
   content: '−';
 }

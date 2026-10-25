@@ -30,7 +30,7 @@ declare global {
   type JevStatus = 'inspecting' | Risk['level']
   // risk is null for tools that always ask without Guard (addSkill).
   type ApprovalRequest = { id: string; tool: string; detail: string; risk: Risk | null }
-  type ToolEvent = { id: string; name: string; running: boolean; skill?: string }
+  type ToolEvent = { id: string; name: string; running: boolean; skill?: string; input?: string }
   // An entry of agentModels in src/main/llm_model.ts; prices are US$ per 1M tokens.
   type AgentModel = { id: string; label: string; input: number; output: number }
   // Same as Memory in src/main/llm_memory.ts.

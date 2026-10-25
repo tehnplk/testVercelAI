@@ -73,8 +73,12 @@ function UserMessage({ content }: { content: string }): React.JSX.Element {
 // Skills and tool calls of a turn, shown above its final answer.
 function TurnInfo({ turn }: { turn: NonNullable<ChatMessage['turn']> }): React.JSX.Element {
   return (
-    <div className="turn">
-      {turn.skills.length > 0 && <div>Skill Use : {turn.skills.join(', ')}</div>}
+    <details className="turn">
+      <summary>
+        <span className="turn-input">
+          {turn.skills.length > 0 && `Skill: ${turn.skills.join(', ')} · `}เครื่องมือ {turn.tools.length} รายการ
+        </span>
+      </summary>
       {turn.tools.map((t, i) => (
         <details key={i} className="turn-tool">
           {/* One plain-text row with +/- at its right, so a click anywhere on it only toggles. */}
@@ -104,8 +108,21 @@ function TurnInfo({ turn }: { turn: NonNullable<ChatMessage['turn']> }): React.J
           <pre className="tool-output">{t.console}</pre>
         </details>
       ))}
-    </div>
+    </details>
   )
+}
+
+// Top line of the live tool block: latest skill loaded, and the tool running now (else the last one).
+function liveSummary(log: ToolEvent[]): string {
+  const skill = log.filter((t) => t.name === 'loadSkill').pop()?.skill
+  const tools = log.filter((t) => t.name !== 'loadSkill')
+  const cur = tools.filter((t) => t.running).pop() ?? tools[tools.length - 1]
+  return [
+    skill && `Skill: ${skill}`,
+    cur && `กำลังใช้: ${cur.running ? '' : '✓ '}${cur.name === 'runBash' ? 'Bash' : cur.name}${cur.input ? ` : ${cur.input}` : ''}`
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 // Title, start time and tokens of the open session; a chat not sent yet is just "แชตใหม่".
@@ -329,19 +346,33 @@ function App(): React.JSX.Element {
             ))}
             {pending && (
               <div className="msg assistant pending">
-                {toolLog.map((t) => (
-                  <div key={t.id}>
-                    <div className={t.running ? 'tool-line running' : 'tool-line'}>
-                      {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
-                    </div>
-                    {jev[t.id] && (
-                      <div className={`jev-line jev-${jev[t.id]}`}>
-                        Guard : {JEV_TEXT[jev[t.id]]}
+                {toolLog.length > 0 && (
+                  <details className="turn">
+                    <summary>
+                      <span className="turn-input">{liveSummary(toolLog)}</span>
+                    </summary>
+                    {toolLog.map((t) => (
+                      <div key={t.id}>
+                        <div className={t.running ? 'tool-line running' : 'tool-line'}>
+                          {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
+                        </div>
+                        {jev[t.id] && (
+                          <div className={`jev-line jev-${jev[t.id]}`}>
+                            Guard : {JEV_TEXT[jev[t.id]]}
+                          </div>
+                        )}
+                        {toolOutput[t.id] && (
+                          <details className="tool-result">
+                            <summary>
+                              <span className="turn-input">output</span>
+                            </summary>
+                            <pre className="tool-output">{toolOutput[t.id]}</pre>
+                          </details>
+                        )}
                       </div>
-                    )}
-                    {toolOutput[t.id] && <pre className="tool-output">{toolOutput[t.id]}</pre>}
-                  </div>
-                ))}
+                    ))}
+                  </details>
+                )}
                 {streamed && (
                   <Markdown remarkPlugins={[remarkGfm]} components={liveComponents} urlTransform={urlTransform}>
                     {linkifyPaths(streamed)}
