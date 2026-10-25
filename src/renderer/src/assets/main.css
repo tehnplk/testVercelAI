@@ -480,9 +480,9 @@ body {
 
 .msg.user {
   align-self: flex-end;
-  border: 1px solid #3b4d70;
-  background: #2b3a55;
-  color: var(--ev-c-white-soft);
+  border: 1px solid #45454a;
+  background: #1e1e21;
+  color: #e0e0e0;
 }
 
 .msg.user::selection,
@@ -1045,8 +1045,8 @@ body {
 }
 
 .msg.user .file-chip {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: #45454a;
+  background: #2f2f33;
 }
 
 .file-chip-name {
