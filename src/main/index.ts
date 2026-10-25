@@ -49,7 +49,7 @@ function toolPurpose(toolCall: { input: unknown }): string | undefined {
 // Model calls per message. The last one gets no tools and lastStepNote, so a reply always ends in an answer.
 // The note goes in as a user message after the last tool result: in the system prompt, Claude Haiku and
 // DeepSeek ignore it after many tool calls and end the turn with empty text.
-const maxSteps = 20
+const maxSteps = 30
 const lastStepNote =
   'This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).'
 // Saved and shown when the run still ends without text.
