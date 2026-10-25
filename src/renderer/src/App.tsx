@@ -208,10 +208,13 @@ function App(): React.JSX.Element {
   const bottom = useRef<HTMLDivElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const opening = useRef<number | null>(null)
+  // Bumped when the user opens a chat, so message elements (and their native <details> open state) are not reused across chats.
+  const [chatKey, setChatKey] = useState(0)
 
   // null opens an empty chat; the session is created when its first message is sent.
   const openSession = async (id: number | null): Promise<void> => {
     opening.current = id
+    setChatKey((k) => k + 1)
     setSessionId(id)
     setError(null)
     const history = id === null ? [] : await window.api.history(id)
@@ -344,7 +347,7 @@ function App(): React.JSX.Element {
           <ChatHeader session={session} />
           <main className="messages">
             {messages.map((m, i) => (
-              <div key={i} className={`msg ${m.role}`}>
+              <div key={`${chatKey}-${i}`} className={`msg ${m.role}`}>
                 {m.role === 'assistant' ? (
                   <>
                     {m.turn && <TurnInfo turn={m.turn} />}
