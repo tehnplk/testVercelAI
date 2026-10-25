@@ -30,12 +30,20 @@ export function linkifyPaths(markdown: string): string {
 // A .docx file opens in the in-app viewer; any other file opens in its default app.
 function FileLink({ node: _node, href, children, ...props }: React.ComponentProps<'a'> & ExtraProps): React.JSX.Element {
   const viewDocx = useContext(ViewDocx)
-  if (!href?.startsWith(OPEN))
+  if (!href?.startsWith(OPEN)) {
+    // A bare URL autolinked by remark-gfm (text equals href) shows only its hostname.
+    const bare = /^https?:\/\//.test(href ?? '') && children === href
+    let label = children
+    if (bare)
+      try {
+        label = new URL(href!).hostname.replace(/^www\./, '')
+      } catch {}
     return (
-      <a href={href} target="_blank" rel="noreferrer" {...props}>
-        {children}
+      <a href={href} target="_blank" rel="noreferrer" {...props} title={bare ? href : props.title}>
+        {label}
       </a>
     )
+  }
   const path = decodeURIComponent(href.slice(OPEN.length))
   const open = async (e: React.MouseEvent): Promise<void> => {
     e.preventDefault()
