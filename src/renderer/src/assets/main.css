@@ -290,8 +290,11 @@ body {
   /* Bleed through .sidebar-inner padding to span the full sidebar width. */
   margin: 0 -12px -12px;
   padding: 8px 12px;
-  border-top: 1px solid var(--ev-c-gray-2);
-  background: var(--ev-c-gray-3);
+  border-top: 1px solid rgba(0, 0, 0, 0.6);
+  /* Soft upward shadow plus a faint light line under the border for depth. */
+  box-shadow:
+    0 -6px 12px -6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .profile-button {
@@ -311,7 +314,7 @@ body {
 
 .profile-button:hover,
 .profile-button[aria-expanded='true'] {
-  background: var(--ev-c-gray-2);
+  background: var(--color-background-mute);
 }
 
 .profile-avatar {
