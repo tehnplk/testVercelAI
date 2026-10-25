@@ -382,15 +382,26 @@ body {
   padding: 0;
 }
 
+/* Links in messages: calm, no browser blue; the underline brightens on hover. */
+.msg a,
+.msg a:visited {
+  color: var(--ev-c-white-soft);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.msg a:hover {
+  text-decoration-color: currentColor;
+}
+
 .file-link {
-  color: #6ea8fe;
   cursor: pointer;
 }
 
 .file-link code {
   color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .code-block {
