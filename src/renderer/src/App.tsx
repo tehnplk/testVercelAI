@@ -31,11 +31,13 @@ const ATTACH_HEAD = 'ไฟล์แนบ:\n'
 
 const baseName = (path: string): string => path.split(/[\\/]/).pop() || path
 
-// Splits a sent message into its text and the attached file paths (see send).
+// Splits a sent message into its text and the attached file paths (see send). Lines in [ ] are notes for the
+// model about an attached image (main llm_image.ts withAttachedImages), not files.
 function splitAttachments(content: string): { text: string; files: string[] } {
   const at = content.indexOf('\n\n' + ATTACH_HEAD)
   if (at < 0) return { text: content, files: [] }
-  return { text: content.slice(0, at), files: content.slice(at + 2 + ATTACH_HEAD.length).split('\n').filter(Boolean) }
+  const lines = content.slice(at + 2 + ATTACH_HEAD.length).split('\n')
+  return { text: content.slice(0, at), files: lines.filter((l) => l && !l.startsWith('[')) }
 }
 
 // A file shown by its name only; the full path is in the tooltip. Has a remove button when onRemove is given.

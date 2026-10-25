@@ -10,7 +10,7 @@ import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
 import { assessRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
-import { imageTools } from './llm_image'
+import { imageTools, splitAttachments, withAttachedImages } from './llm_image'
 import { fetchImage, webTools } from './llm_web'
 import { memoryPrompt, recallTools } from './llm_recall'
 import { randomUUID } from 'crypto'
@@ -211,10 +211,10 @@ app.whenReady().then(() => {
     if (typeof content !== 'string' || !content.trim()) throw new Error('Empty message')
     if (sessionId !== null && typeof sessionId !== 'number') throw new Error('Invalid session')
     if (!isAgentModel(model)) throw new Error('Invalid model')
-    // The renderer appends attached file paths after "\n\nไฟล์แนบ:\n"; they are not part of the title.
-    const id = sessionId ?? (await newSession(content.split('\n\nไฟล์แนบ:\n')[0].trim().slice(0, 60), model))
+    // Attached file paths are not part of the title.
+    const id = sessionId ?? (await newSession(splitAttachments(content).text.trim().slice(0, 60), model))
     const modelId = sessionId === null ? model : await sessionModel(id)
-    await saveMessages(id, [{ role: 'user', content }])
+    await saveMessages(id, [withAttachedImages(content)])
     // Stored after every agent step and Jev call, so a reply that fails halfway keeps what it spent,
     // and the header follows live. A provider that reports no count adds 0.
     const countUsage = async (u: Partial<TokenUsage>): Promise<void> =>
