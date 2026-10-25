@@ -1296,6 +1296,12 @@ body {
   color: var(--ev-c-text-3);
 }
 
+/* base.css resets every font-weight to normal, so the name sets its own. */
+.skill-name {
+  font-weight: 600;
+  color: var(--ev-c-white-soft);
+}
+
 .skill-description {
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -1304,19 +1310,27 @@ body {
   color: var(--ev-c-text-2);
 }
 
+/* Same calm look as links in messages: no blue, thin soft underline, solid on hover. */
 .skill-open {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 0;
   margin-top: 2px;
   border: none;
   background: transparent;
-  color: #2f6fed;
+  color: var(--ev-c-white-soft);
   font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 
 .skill-open:hover {
-  text-decoration: underline;
+  text-decoration-color: currentColor;
 }
 
 .skill-open:focus-visible {
