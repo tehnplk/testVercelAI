@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Check, Pencil, Pin, Shield, ShieldOff, Trash, Trash2 } from 'lucide-react'
+import { Bookmark, Check, Pencil, Pin, Puzzle, Shield, ShieldOff, Trash, Trash2 } from 'lucide-react'
 import MemoryList from './MemoryList'
+import SkillList from './SkillList'
 
 const MIN_WIDTH = 180
 const COLLAPSE_BELOW = 120
@@ -67,6 +68,8 @@ const shieldIcon = (on: boolean): React.JSX.Element =>
 
 const memoryIcon = <Bookmark size={16} strokeWidth={1.75} aria-hidden="true" />
 
+const skillsIcon = <Puzzle size={16} strokeWidth={1.75} aria-hidden="true" />
+
 const clearIcon = <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
 
 type Props = {
@@ -99,6 +102,7 @@ function Sidebar({
   const [query, setQuery] = useState('')
   const [renaming, setRenaming] = useState<number | null>(null)
   const [showMemory, setShowMemory] = useState(false)
+  const [showSkills, setShowSkills] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [userName, setUserName] = useState('')
   const profile = useRef<HTMLDivElement>(null)
@@ -279,6 +283,16 @@ function Sidebar({
                   {memoryIcon}
                   ความจำ
                 </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setShowSkills(true)
+                  }}
+                >
+                  {skillsIcon}
+                  Skills
+                </button>
                 {/* Toggles at once both ways and keeps the menu open so the switch visibly moves; the red "Guard ปิด" badge under the chat box is the reminder. */}
                 <button role="menuitemcheckbox" aria-checked={guard} onClick={() => onGuard(!guard)}>
                   {shieldIcon(guard)}
@@ -314,6 +328,7 @@ function Sidebar({
         </div>
       </aside>
       {showMemory && <MemoryList onClose={() => setShowMemory(false)} />}
+      {showSkills && <SkillList onClose={() => setShowSkills(false)} />}
       <div
         className={dragging ? 'resizer dragging' : 'resizer'}
         role="separator"

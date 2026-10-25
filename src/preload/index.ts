@@ -11,6 +11,7 @@ const api = {
   pinSession: (sessionId: number, pinned: boolean) => ipcRenderer.invoke('sessions:pin', sessionId, pinned),
   setSessionModel: (sessionId: number, model: string) => ipcRenderer.invoke('sessions:set-model', sessionId, model),
   models: () => ipcRenderer.invoke('models:list'),
+  skills: () => ipcRenderer.invoke('skills:list'),
   memories: () => ipcRenderer.invoke('memories:list'),
   deleteMemory: (id: number) => ipcRenderer.invoke('memories:delete', id),
   guard: () => ipcRenderer.invoke('guard:get'),

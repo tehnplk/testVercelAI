@@ -177,6 +177,12 @@ app.whenReady().then(() => {
     return setSessionModel(sessionId as number, model)
   })
   ipcMain.handle('models:list', () => agentModels)
+  // The skills the agent sees, for the Skills dialog.
+  ipcMain.handle('skills:list', () =>
+    discoverSkills()
+      .map(({ name, description, path }) => ({ name, description, dir: path }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  )
   ipcMain.handle('memories:list', () => listMemories())
   ipcMain.handle('memories:delete', async (_, id: unknown) => {
     if (!Number.isInteger(id)) throw new Error('Invalid memory')

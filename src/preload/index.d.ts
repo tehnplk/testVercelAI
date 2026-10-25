@@ -36,6 +36,7 @@ declare global {
   type AgentModel = { id: string; label: string; input: number; output: number }
   // Same as Memory in src/main/llm_memory.ts.
   type Memory = { id: number; content: string; createdAt: Date }
+  type SkillInfo = { name: string; description: string; dir: string }
 
   interface Window {
     electron: ElectronAPI
@@ -53,6 +54,8 @@ declare global {
       setSessionModel: (sessionId: number, model: string) => Promise<void>
       /** The agent models to pick from; the first is the default. */
       models: () => Promise<AgentModel[]>
+      /** The installed skills, sorted by name; dir is the skill's folder. */
+      skills: () => Promise<SkillInfo[]>
       /** The agent's saved notes, newest first. */
       memories: () => Promise<Memory[]>
       deleteMemory: (id: number) => Promise<void>
