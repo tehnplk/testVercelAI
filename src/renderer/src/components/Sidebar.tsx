@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import MemoryList from './MemoryList'
 
 const MIN_WIDTH = 180
 const COLLAPSE_BELOW = 120
@@ -92,6 +93,7 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
   const [dragging, setDragging] = useState(false)
   const [query, setQuery] = useState('')
   const [renaming, setRenaming] = useState<number | null>(null)
+  const [showMemory, setShowMemory] = useState(false)
 
   // Sessions arrive newest first and pinned ones go first, so groups fill in display order
   // (pinned, then by date) and empty ones never appear.
@@ -232,8 +234,13 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
             ))}
             {q && groups.size === 0 && <div className="sessions-empty">ไม่พบแชต</div>}
           </nav>
+          {/* Same look as + แชตใหม่; open while a reply runs too, since that reply's prompt is already built. */}
+          <button className="new-session" onClick={() => setShowMemory(true)}>
+            ความจำ
+          </button>
         </div>
       </aside>
+      {showMemory && <MemoryList onClose={() => setShowMemory(false)} />}
       <div
         className={dragging ? 'resizer dragging' : 'resizer'}
         role="separator"

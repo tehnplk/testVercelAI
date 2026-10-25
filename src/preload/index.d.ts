@@ -33,6 +33,8 @@ declare global {
   type ToolEvent = { id: string; name: string; running: boolean; skill?: string }
   // An entry of agentModels in src/main/llm_model.ts; prices are US$ per 1M tokens.
   type AgentModel = { id: string; label: string; input: number; output: number }
+  // Same as Memory in src/main/llm_memory.ts.
+  type Memory = { id: number; content: string; createdAt: Date }
 
   interface Window {
     electron: ElectronAPI
@@ -46,6 +48,9 @@ declare global {
       setSessionModel: (sessionId: number, model: string) => Promise<void>
       /** The agent models to pick from; the first is the default. */
       models: () => Promise<AgentModel[]>
+      /** The agent's saved notes, newest first. */
+      memories: () => Promise<Memory[]>
+      deleteMemory: (id: number) => Promise<void>
       history: (sessionId: number) => Promise<ChatMessage[]>
       /** model (one of models()) is stored on a new session; an existing session uses its own. */
       send: (sessionId: number | null, content: string, model: string) => Promise<{ sessionId: number; text: string }>

@@ -9,6 +9,8 @@ const api = {
   pinSession: (sessionId: number, pinned: boolean) => ipcRenderer.invoke('sessions:pin', sessionId, pinned),
   setSessionModel: (sessionId: number, model: string) => ipcRenderer.invoke('sessions:set-model', sessionId, model),
   models: () => ipcRenderer.invoke('models:list'),
+  memories: () => ipcRenderer.invoke('memories:list'),
+  deleteMemory: (id: number) => ipcRenderer.invoke('memories:delete', id),
   history: (sessionId: number) => ipcRenderer.invoke('chat:history', sessionId),
   send: (sessionId: number | null, content: string, model: string) =>
     ipcRenderer.invoke('chat:send', sessionId, content, model),

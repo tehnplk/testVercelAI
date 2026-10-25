@@ -31,6 +31,8 @@ export type SessionUsage = Pick<
   Session,
   'agentInputTokens' | 'agentOutputTokens' | 'guardInputTokens' | 'guardOutputTokens'
 >
+// A note the agent saved with remember (llm_recall.ts).
+export type Memory = { id: number; content: string; createdAt: Date }
 
 const db = new PGlite(join(app.getPath('userData'), 'pgdata'))
 
@@ -74,6 +76,13 @@ async function migrate(): Promise<void> {
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pinned boolean NOT NULL DEFAULT false;
     -- Agent model id (llm_model.ts agentModels); NULL: the default.
     ALTER TABLE sessions ADD COLUMN IF NOT EXISTS model text;
+    -- Notes the agent keeps across chats (llm_recall.ts); the same text is stored once.
+    CREATE TABLE IF NOT EXISTS memories (
+      id serial PRIMARY KEY,
+      content text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS memories_content ON memories (content);
   `)
   // Messages from before sessions existed go into one session.
   const orphans = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM messages WHERE session_id IS NULL')
@@ -161,6 +170,30 @@ export async function deleteSession(sessionId: number): Promise<void> {
     await tx.query('DELETE FROM messages WHERE session_id = $1', [sessionId])
     await tx.query('DELETE FROM sessions WHERE id = $1', [sessionId])
   })
+}
+
+// Newest first.
+export async function listMemories(): Promise<Memory[]> {
+  await ready
+  const { rows } = await db.query<Memory>('SELECT id, content, created_at AS "createdAt" FROM memories ORDER BY id DESC')
+  return rows
+}
+
+// The note's id; text that is already saved keeps its id and date.
+export async function addMemory(content: string): Promise<number> {
+  await ready
+  const { rows } = await db.query<{ id: number }>(
+    'INSERT INTO memories (content) VALUES ($1) ON CONFLICT (content) DO UPDATE SET content = excluded.content RETURNING id',
+    [content]
+  )
+  return rows[0].id
+}
+
+// The deleted note's text, or null when there is no such note.
+export async function deleteMemory(id: number): Promise<string | null> {
+  await ready
+  const { rows } = await db.query<{ content: string }>('DELETE FROM memories WHERE id = $1 RETURNING content', [id])
+  return rows[0]?.content ?? null
 }
 
 // Turns (a user message up to the next) sent in full, the current one included; older turns are cut down.
@@ -260,6 +293,9 @@ function shown(name: string, result: Part | undefined): Pick<ToolCall, 'output' 
         : JSON.stringify(o.value ?? o)
   if (o.type === 'execution-denied' || (name === 'Bash' && text.startsWith('The user denied this run')))
     return { output: 'ถูกปฏิเสธ', files: [], console: cap(text) }
+  // remember and forget (llm_recall.ts): the saved "[id] note", or ลบแล้ว; a path in a note never becomes a file link.
+  if (name === 'remember' || name === 'forget')
+    return { output: name === 'forget' && text.startsWith('Deleted') ? 'ลบแล้ว' : text, files: [], console: text }
   // webSearch and webFetch (llm_web.ts): the first line (result count or page title) is the output, the console
   // keeps the start, and paths in a web page never become file links.
   if (name === 'webSearch' || name === 'webFetch')

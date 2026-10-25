@@ -934,3 +934,60 @@ body {
   outline: 2px solid #2f6fed;
   outline-offset: -2px;
 }
+
+/* Memory list: ModelPicker's frame; only the list scrolls. */
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.memory-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.memory-item:hover {
+  background: var(--color-background-mute);
+}
+
+.memory-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.memory-text time {
+  font-size: 11px;
+  color: var(--ev-c-text-3);
+}
+
+.memory-delete {
+  flex-shrink: 0;
+  display: flex;
+  padding: 5px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  cursor: pointer;
+}
+
+.memory-delete:hover {
+  background: var(--color-background);
+  color: #ef5350;
+}
+
+.memory-delete:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: -2px;
+}

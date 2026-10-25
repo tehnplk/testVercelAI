@@ -12,10 +12,13 @@ import { assessRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
 import { imageTools } from './llm_image'
 import { webTools } from './llm_web'
+import { memoryPrompt, recallTools } from './llm_recall'
 import { randomUUID } from 'crypto'
 import {
   addUsage,
+  deleteMemory,
   deleteSession,
+  listMemories,
   listSessions,
   loadChat,
   loadModelMessages,
@@ -104,6 +107,11 @@ app.whenReady().then(() => {
     return setSessionModel(sessionId as number, model)
   })
   ipcMain.handle('models:list', () => agentModels)
+  ipcMain.handle('memories:list', () => listMemories())
+  ipcMain.handle('memories:delete', async (_, id: unknown) => {
+    if (!Number.isInteger(id)) throw new Error('Invalid memory')
+    await deleteMemory(id as number)
+  })
 
   // Files that would run when opened are shown in Explorer instead.
   const runnable = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|lnk|scr|hta|reg|jar|py|pyw|sh|cpl)$/i
@@ -189,11 +197,12 @@ app.whenReady().then(() => {
       return ok
     }
     const messages = await loadModelMessages(id)
-    // Read on every message, so a skill folder added while the app runs is picked up.
+    // Read on every message, so a skill folder added while the app runs is picked up, and notes saved in
+    // another chat are known.
     const skills = discoverSkills()
     const result = streamText({
       model: agentModel(modelId),
-      system: systemPrompt + skillsPrompt(skills),
+      system: systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories()),
       tools: {
         // The summary model's tokens count as the agent's.
         ...shellTools(approve, toolOutput, content, (u) =>
@@ -201,6 +210,7 @@ app.whenReady().then(() => {
         ),
         ...skillTools(skills, approve),
         ...imageTools,
+        ...recallTools,
         // Web search fees are not tokens; only the tokens of its model and webFetch's helper are counted.
         ...webTools((u) => countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens }))
       },
