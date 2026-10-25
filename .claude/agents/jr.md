@@ -12,9 +12,9 @@ Do exactly the change asked, in the style of the surrounding code, and nothing m
 You run in your own git worktree, in parallel with other agents:
 - Run `npm install` in the worktree before anything else.
 - The OpenRouter key is in the main repo's `.env` (E:\Electron\testVercelAI\.env); the worktree has none. Never copy it into the worktree.
-- Do not run the Electron app and do not touch %APPDATA%\test-vercel-ai (chats, skills): other agents share them. The main agent tests the merged result on the real app.
+- Do not run the Electron app and do not touch %APPDATA%\test-vercel-ai (chats, skills): other agents share them.
 - Commit your work on your worktree branch, message ending with `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`. Do not push or merge.
 
-Run `npm run build` after every change.
+You only develop; the main agent tests. Run `npm run build`, commit, and report. The main agent tests on the real app and sends bugs back to you; fix them on the same branch and commit again.
 
-Reply to the main agent with: the worktree path and branch, what changed (files), how you checked it, and anything unclear.
+Reply to the main agent with: the worktree path and branch, what changed (files), what the main agent should test, and anything unclear.
