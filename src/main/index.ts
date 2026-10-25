@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, dialog, ipcMain, protocol } from 'electron'
 import { extname, join } from 'path'
-import { createReadStream, existsSync } from 'fs'
-import { readFile, realpath, stat } from 'fs/promises'
+import { createReadStream, existsSync, readFileSync } from 'fs'
+import { readFile, realpath, stat, writeFile } from 'fs/promises'
 import { Readable } from 'stream'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -9,7 +9,7 @@ import { isStepCount, streamText } from 'ai'
 import { agentModel, agentModels, isAgentModel } from './llm_model'
 import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
-import { assessRisk, type Risk } from './llm_risk'
+import { assessRisk, printRisk, type Risk } from './llm_risk'
 import { discoverSkills, skillsPrompt, skillTools } from './llm_skills'
 import { imageTools, splitAttachments, withAttachedImages } from './llm_image'
 import { fetchImage, webTools } from './llm_web'
@@ -183,6 +183,22 @@ app.whenReady().then(() => {
     await deleteMemory(id as number)
   })
 
+  // Guard on/off, kept in userData/settings.json; on unless the user turned it off. approve reads it on
+  // every tool call, so a change applies to the reply in progress too.
+  const settingsFile = join(app.getPath('userData'), 'settings.json')
+  let guardOn = true
+  try {
+    guardOn = JSON.parse(readFileSync(settingsFile, 'utf8')).guard !== false
+  } catch {
+    /* no file yet: on */
+  }
+  ipcMain.handle('guard:get', () => guardOn)
+  ipcMain.handle('guard:set', async (_, on: unknown) => {
+    if (typeof on !== 'boolean') throw new Error('Invalid guard')
+    await writeFile(settingsFile, JSON.stringify({ guard: on }))
+    guardOn = on
+  })
+
   // Files that would run when opened are shown in Explorer instead.
   const runnable = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|lnk|scr|hta|reg|jar|py|pyw|sh|cpl)$/i
   ipcMain.handle('file:open', async (_, path: unknown) => {
@@ -295,8 +311,16 @@ app.whenReady().then(() => {
       })
     // Jev judges the run first: SAFE runs at once, RISK shows the approval card.
     // alwaysAsk (addSkill) shows the card without Guard, and the card has no Guard line.
+    // With Guard off no model is called: everything runs at once except printing, which still asks.
     const approve = async (tool: string, detail: string, toolCallId: string, alwaysAsk = false): Promise<boolean> => {
       if (alwaysAsk) return ask(tool, detail, null)
+      if (!guardOn) {
+        const print = printRisk(detail)
+        event.sender.send('chat:jev', { id: toolCallId, status: print ? 'risk' : 'off' })
+        const ok = !print || (await ask(tool, detail, print))
+        if (ok) ran.push(detail)
+        return ok
+      }
       event.sender.send('chat:jev', { id: toolCallId, status: 'inspecting' })
       const { risk, usage } = await assessRisk(tool, detail, ran)
       await countUsage({ guardInput: usage?.inputTokens, guardOutput: usage?.outputTokens })

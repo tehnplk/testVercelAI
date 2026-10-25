@@ -13,6 +13,8 @@ const api = {
   models: () => ipcRenderer.invoke('models:list'),
   memories: () => ipcRenderer.invoke('memories:list'),
   deleteMemory: (id: number) => ipcRenderer.invoke('memories:delete', id),
+  guard: () => ipcRenderer.invoke('guard:get'),
+  setGuard: (on: boolean) => ipcRenderer.invoke('guard:set', on),
   history: (sessionId: number) => ipcRenderer.invoke('chat:history', sessionId),
   send: (sessionId: number | null, content: string, model: string) =>
     ipcRenderer.invoke('chat:send', sessionId, content, model),
@@ -31,8 +33,8 @@ const api = {
   readDocx: (path: string) => ipcRenderer.invoke('file:read-docx', path),
   loadImage: (src: string) => ipcRenderer.invoke('image:load', src),
   pickFiles: () => ipcRenderer.invoke('file:pick'),
-  onJev: (cb: (update: { id: string; status: 'inspecting' | 'safe' | 'risk' }) => void) => {
-    const listener = (_: unknown, update: { id: string; status: 'inspecting' | 'safe' | 'risk' }): void => cb(update)
+  onJev: (cb: (update: { id: string; status: 'inspecting' | 'safe' | 'risk' | 'off' }) => void) => {
+    const listener = (_: unknown, update: { id: string; status: 'inspecting' | 'safe' | 'risk' | 'off' }): void => cb(update)
     ipcRenderer.on('chat:jev', listener)
     return () => ipcRenderer.off('chat:jev', listener)
   },
