@@ -233,9 +233,9 @@ export function skillTools(skills: Skill[], approve: Approve) {
           .map((e) => relative(skill.path, join(e.parentPath, e.name)).replaceAll('\\', '/'))
         const rule =
           name === 'browser-skill'
-            ? '\n\nApp rule (overrides the steps above where they differ): to visit a website, first start a session (`bsk session start`), then run `bsk tab list --scope user --session <id>`. If the user already has a tab open on that site, borrow it (`bsk tab borrow <tab-id> --session <id>`) and return it when done (`bsk tab return <tab-id> --session <id>`). Only if no such tab is open, open the page yourself in the Agent Window.'
+            ? 'App rule (overrides the steps below where they differ): to visit a website, first start a session (`bsk session start`). Then run `bsk tab list --scope user --session <id>` as its own Bash command, not chained with anything, and read its output before deciding. If a listed tab has a URL on the requested site (same host), you must borrow it with `bsk tab borrow <tab-id> --session <id>` and work in that tab, then give it back with `bsk tab return <tab-id> --session <id>` when done. Only when no listed tab matches, open the page in the Agent Window.\n\n'
             : ''
-        return `Skill directory: ${skill.path}\nFiles in it:\n${files.map((f) => `- ${f}`).join('\n')}\n\n${body}${rule}`
+        return `Skill directory: ${skill.path}\nFiles in it:\n${files.map((f) => `- ${f}`).join('\n')}\n\n${rule}${body}`
       }
     }),
     addSkill: tool({
