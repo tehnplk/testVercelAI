@@ -8,9 +8,27 @@ type Tokens = { inputTokens: number; outputTokens: number }
 
 // One rule text for both checkers, so the decider and Jev judge alike.
 const safeRule =
-  'Any one of these: read-only or harmless, e.g. listing or reading files, printing, calculations, network diagnostics like ping. Creating or writing new files of any type except .exe, .sh or .bat. Changing or overwriting a file that one of earlier_commands_of_this_task created or copied, except .exe, .sh or .bat. The bsk browser CLI used to read, look or move around: bsk browsers, status, doctor, session start/stop/list, tab list/create/borrow/return, navigate to an http(s) URL, observe, snapshot, get-html, extract, screenshot, scroll-to, wheel, hover, click, focus, blur, wait-ms, wait-for-element, sleep, --help on any bsk command, and bsk evaluate whose JavaScript only reads the page (querySelector/querySelectorAll, innerText, textContent, getAttribute, href, map, filter, slice, JSON.stringify). On facebook.com only, also bsk fill (typing, e.g. into the search box) and bsk press of keys other than Enter. Commands chained with ; or && when every part is safe. A read-only GET request with curl to https://skills.sh/api/search (searching the skills directory), optionally piped into a command that only parses or prints the result.'
+  'Any one of these: read-only or harmless, e.g. listing or reading files, echoing text to the terminal, calculations, network diagnostics like ping. Creating or writing new files of any type except .exe, .sh or .bat. Changing or overwriting a file that one of earlier_commands_of_this_task created or copied, except .exe, .sh or .bat. The bsk browser CLI used to read, look or move around: bsk browsers, status, doctor, session start/stop/list, tab list/create/borrow/return, navigate to an http(s) URL, observe, snapshot, get-html, extract, screenshot, scroll-to, wheel, hover, click, focus, blur, wait-ms, wait-for-element, sleep, --help on any bsk command, and bsk evaluate whose JavaScript only reads the page (querySelector/querySelectorAll, innerText, textContent, getAttribute, href, map, filter, slice, JSON.stringify). On facebook.com only, also bsk fill (typing, e.g. into the search box) and bsk press of keys other than Enter. Commands chained with ; or && when every part is safe. A read-only GET request with curl to https://skills.sh/api/search (searching the skills directory), optionally piped into a command that only parses or prints the result.'
 const riskRule =
-  'Any one of these: creating or writing .exe, .sh or .bat files. Installing, upgrading or removing any package or program (pip, npm, npx, winget, choco, installers), always. bsk actions that type, send or change data: fill, press, select, upload, download (fill and press are safe on facebook.com only), and anything that submits a form, on facebook.com too: posting, commenting, sending a message, pressing Enter in a form. bsk evaluate whose JavaScript changes the page or acts: assigning to anything, .click(), .submit(), dispatchEvent, fetch or XMLHttpRequest, location, cookies or localStorage, filling form fields. A chain with ; or && when any part is risky. Anything else, e.g. changing, overwriting, moving or deleting existing files, changing settings, uploading or downloading data, running downloaded code, touching credentials or personal files, or anything hard to understand.'
+  'Any one of these: creating or writing .exe, .sh or .bat files. Printing on a printer, always (it uses paper and cannot be undone): the Print or PrintTo verb (Start-Process -Verb Print, os.startfile(f, "print"), ShellExecute "print"), Out-Printer, print.exe or print /d:, rundll32 PrintUIEntry or printui, mspaint /p, notepad /p, SumatraPDF -print-to or -print-to-default, Acrobat /p or /t, lpr, Office COM .PrintOut(, win32print, PrintDocument, or anything else that sends a job to a printer. Installing, upgrading or removing any package or program (pip, npm, npx, winget, choco, installers), always. bsk actions that type, send or change data: fill, press, select, upload, download (fill and press are safe on facebook.com only), and anything that submits a form, on facebook.com too: posting, commenting, sending a message, pressing Enter in a form. bsk evaluate whose JavaScript changes the page or acts: assigning to anything, .click(), .submit(), dispatchEvent, fetch or XMLHttpRequest, location, cookies or localStorage, filling form fields. A chain with ; or && when any part is risky. Anything else, e.g. changing, overwriting, moving or deleting existing files, changing settings, uploading or downloading data, running downloaded code, touching credentials or personal files, or anything hard to understand.'
+
+// Deterministic pre-check: anything that may print on a printer is RISK without a model (paper, cannot be undone).
+// Conservative on purpose: a stray match only costs an approval card.
+// ponytail: a text screen; a print hidden behind -EncodedCommand or a built-up string still goes to the models.
+const printsRe = new RegExp(
+  [
+    String.raw`\bverb\b[\s:=]*['"(\\]*(\$|print)`, // -Verb Print, -Verb:PrintTo, .Verb = \"Print\", -Verb $v
+    String.raw`\s-ve?r?[\s:]+['"\\]*print`, // PowerShell's short -v / -ve / -ver for -Verb
+    String.raw`printto|printuientry|\bprintui\b|printhtml|out-printer|\b(start|add)-printjob\b`,
+    String.raw`(startfile|shellexecute\w*|invokeverb\w*)\s*\([^)]*['"]&?print`, // os.startfile(f, "print"), InvokeVerb("&Print")
+    String.raw`\bprint(\.exe|\s+/d:)|\blpr\b|\.printout\b|win32print|printdocument|pdf-to-printer|kiosk-printing`,
+    String.raw`\.print\s*\(\s*\)`, // window.print(), PrintDocument.Print()
+    String.raw`-print-(to\b(?!-pdf)|dialog)`, // SumatraPDF -print-to / -print-to-default; Chrome --print-to-pdf only writes a file
+    String.raw`\b(mspaint|notepad|wordpad|acrord32|acrobat|soffice|swriter)(\.exe)?\b[^\n]*\s(/|--?)(p|pt|t)\b`,
+    String.raw`(>|\bcopy\b[^\n]*\s)\s*(prn|lpt\d)\b`
+  ].join('|'),
+  'i'
+)
 
 // Deterministic pre-check: a Bash command made only of read-only bsk commands and sleep is SAFE without a
 // model. Anything it does not recognise goes to the models as before.
@@ -281,6 +299,8 @@ export async function assessRisk(
   earlier: string[]
 ): Promise<{ risk: Risk; usage: Pick<LanguageModelUsage, 'inputTokens' | 'outputTokens'> }> {
   const usage: Tokens = { inputTokens: 0, outputTokens: 0 }
+  if (printsRe.test(detail))
+    return { risk: { level: 'risk', reason: 'กฎในโค้ด: สั่งพิมพ์ออกเครื่องพิมพ์ ใช้กระดาษและย้อนกลับไม่ได้' }, usage }
   // A Bash detail is "<cwd>\n$ <command>".
   const at = detail.indexOf('\n$ ')
   if (tool === 'Bash' && at >= 0 && (await bskChainSafe(detail.slice(at + 3))))
