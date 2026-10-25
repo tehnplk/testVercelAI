@@ -78,56 +78,61 @@ function UserMessage({ content }: { content: string }): React.JSX.Element {
 // Skills and tool calls of a turn, shown above its final answer.
 function TurnInfo({ turn }: { turn: NonNullable<ChatMessage['turn']> }): React.JSX.Element {
   return (
-    <details className="turn">
-      <summary>
-        <span className="turn-input">
-          {turn.skills.length > 0 && `Skill: ${turn.skills.join(', ')} · `}เครื่องมือ {turn.tools.length} รายการ
-        </span>
-      </summary>
-      {turn.tools.map((t, i) => (
-        <details key={i} className="turn-tool">
-          {/* One plain-text row with +/- at its right, so a click anywhere on it only toggles. */}
+    <>
+      {turn.skills.length > 0 && (
+        <details className="turn">
           <summary>
-            <span className="turn-input" title={t.input}>
-              {t.name} : {t.input}
-            </span>
+            <span className="turn-input">Skill: {turn.skills.join(', ')}</span>
           </summary>
-          <div>
-            output : {t.output}
-            {t.output && t.files.length > 0 && ' · '}
-            {t.files.map((f) => f.split(/[\\/]/).pop()).join(', ')}
-          </div>
-          {t.files.length > 0 && (
-            <div>
-              ไฟล์ :{' '}
-              {t.files.map((f, j) => (
-                <span key={f}>
-                  {j > 0 && ', '}
-                  <FileLink href={OPEN + encodeURIComponent(f)}>
-                    <code>{f.split(/[\\/]/).pop()}</code>
-                  </FileLink>
-                </span>
-              ))}
-            </div>
-          )}
-          <pre className="tool-output">{t.console}</pre>
+          {turn.skills.map((s) => (
+            <div key={s}>Skill Use : {s}</div>
+          ))}
         </details>
-      ))}
-    </details>
+      )}
+      {turn.tools.length > 0 && (
+        <details className="turn">
+          <summary>
+            <span className="turn-input">เครื่องมือ {turn.tools.length} รายการ</span>
+          </summary>
+          {turn.tools.map((t, i) => (
+            <details key={i} className="turn-tool">
+              {/* One plain-text row with +/- at its right, so a click anywhere on it only toggles. */}
+              <summary>
+                <span className="turn-input" title={t.input}>
+                  {t.name} : {t.input}
+                </span>
+              </summary>
+              <div>
+                output : {t.output}
+                {t.output && t.files.length > 0 && ' · '}
+                {t.files.map((f) => f.split(/[\\/]/).pop()).join(', ')}
+              </div>
+              {t.files.length > 0 && (
+                <div>
+                  ไฟล์ :{' '}
+                  {t.files.map((f, j) => (
+                    <span key={f}>
+                      {j > 0 && ', '}
+                      <FileLink href={OPEN + encodeURIComponent(f)}>
+                        <code>{f.split(/[\\/]/).pop()}</code>
+                      </FileLink>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <pre className="tool-output">{t.console}</pre>
+            </details>
+          ))}
+        </details>
+      )}
+    </>
   )
 }
 
-// Top line of the live tool block: latest skill loaded, and the tool running now (else the last one).
-function liveSummary(log: ToolEvent[]): string {
-  const skill = log.filter((t) => t.name === 'loadSkill').pop()?.skill
-  const tools = log.filter((t) => t.name !== 'loadSkill')
+// Top line of the live tool group: the tool running now (else the last one).
+function liveToolSummary(tools: ToolEvent[]): string {
   const cur = tools.filter((t) => t.running).pop() ?? tools[tools.length - 1]
-  return [
-    skill && `Skill: ${skill}`,
-    cur && `กำลังใช้: ${cur.running ? '' : '✓ '}${cur.name === 'runBash' ? 'Bash' : cur.name}${cur.input ? ` : ${cur.input}` : ''}`
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  return `กำลังใช้: ${cur.running ? '' : '✓ '}${cur.name === 'runBash' ? 'Bash' : cur.name}${cur.input ? ` : ${cur.input}` : ''}`
 }
 
 // Title, start time and tokens of the open session; a chat not sent yet is just "แชตใหม่".
@@ -320,6 +325,9 @@ function App(): React.JSX.Element {
     }
   }
 
+  const liveSkills = toolLog.filter((t) => t.name === 'loadSkill')
+  const liveTools = toolLog.filter((t) => t.name !== 'loadSkill')
+
   return (
     <ViewDocx.Provider value={setDocx}>
       <div className="app">
@@ -351,15 +359,27 @@ function App(): React.JSX.Element {
             ))}
             {pending && (
               <div className="msg assistant pending">
-                {toolLog.length > 0 && (
+                {liveSkills.length > 0 && (
                   <details className="turn">
                     <summary>
-                      <span className="turn-input">{liveSummary(toolLog)}</span>
+                      <span className="turn-input">Skill: {liveSkills.map((t) => t.skill).join(', ')}</span>
                     </summary>
-                    {toolLog.map((t) => (
+                    {liveSkills.map((t) => (
+                      <div key={t.id} className={t.running ? 'tool-line running' : 'tool-line'}>
+                        {t.running ? '⏳' : '✓'} Skill Use : {t.skill ?? ''}
+                      </div>
+                    ))}
+                  </details>
+                )}
+                {liveTools.length > 0 && (
+                  <details className="turn">
+                    <summary>
+                      <span className="turn-input">{liveToolSummary(liveTools)}</span>
+                    </summary>
+                    {liveTools.map((t) => (
                       <div key={t.id}>
                         <div className={t.running ? 'tool-line running' : 'tool-line'}>
-                          {t.running ? '⏳' : '✓'} {t.name === 'loadSkill' ? `Skill Use : ${t.skill ?? ''}` : `tool call : ${t.name}`}
+                          {t.running ? '⏳' : '✓'} tool call : {t.name}
                         </div>
                         {jev[t.id] && (
                           <div className={`jev-line jev-${jev[t.id]}`}>
