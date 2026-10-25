@@ -1138,13 +1138,24 @@ body {
   outline: 2px solid #2f6fed;
 }
 
-.guard-off-badge {
+.guard-badge {
   margin-left: 6px;
   padding: 2px 10px;
-  border: 1px solid #ef5350;
+  border: 1px solid;
   border-radius: 999px;
-  color: #ef5350;
   font-size: 11px;
+  line-height: normal;
+}
+
+.guard-badge.on {
+  border-color: rgba(63, 185, 80, 0.5);
+  background: rgba(63, 185, 80, 0.1);
+  color: #3fb950;
+}
+
+.guard-badge.off {
+  border-color: #ef5350;
+  color: #ef5350;
 }
 
 /* Model picker: a small dialog with the same frame as the .docx viewer. */

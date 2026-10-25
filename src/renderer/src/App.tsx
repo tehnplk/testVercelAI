@@ -503,11 +503,18 @@ function App(): React.JSX.Element {
                 >
                   {modelLabel}
                 </button>
-                {!guard && (
-                  <span className="guard-off-badge" title="Guard ปิดอยู่: คำสั่งรันโดยไม่ถาม เปิดได้ที่เมนูโปรไฟล์">
-                    Guard ปิด
-                  </span>
-                )}
+                <span
+                  className={`guard-badge ${guard ? 'on' : 'off'}`}
+                  role="status"
+                  aria-label={guard ? 'Guard เปิด' : 'Guard ปิด'}
+                  title={
+                    guard
+                      ? 'Guard เปิด: คำสั่งเสี่ยงต้องขออนุมัติก่อนรัน ปิดได้ที่เมนูโปรไฟล์'
+                      : 'Guard ปิด: คำสั่งรันโดยไม่ถาม เปิดได้ที่เมนูโปรไฟล์'
+                  }
+                >
+                  {guard ? 'Guard ✓' : 'Guard ✗'}
+                </span>
               </div>
             )}
           </form>
