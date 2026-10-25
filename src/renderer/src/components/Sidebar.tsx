@@ -78,7 +78,14 @@ const checkIcon = (
   </svg>
 )
 
-// Profile menu icons (16px, Lucide bookmark and trash-2).
+// Profile menu icons (16px, Lucide bookmark, trash-2 and shield / shield-off).
+const shieldIcon = (on: boolean): React.JSX.Element => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    {!on && <path d="M2 2l20 20" />}
+  </svg>
+)
+
 const memoryIcon = (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
@@ -100,9 +107,22 @@ type Props = {
   onClear: () => void
   onRename: (id: number, title: string) => void
   onPin: (id: number, pinned: boolean) => void
+  guard: boolean
+  onGuard: (on: boolean) => void
 }
 
-function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onClear, onRename, onPin }: Props): React.JSX.Element {
+function Sidebar({
+  sessions,
+  sessionId,
+  disabled,
+  onOpen,
+  onDelete,
+  onClear,
+  onRename,
+  onPin,
+  guard,
+  onGuard
+}: Props): React.JSX.Element {
   const [layout, setLayout] = useState(loadLayout)
   const [dragging, setDragging] = useState(false)
   const [query, setQuery] = useState('')
@@ -287,6 +307,25 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onClear, onR
                 >
                   {memoryIcon}
                   ความจำ
+                </button>
+                {/* Turning Guard off asks first; turning it on does not. */}
+                <button
+                  role="menuitemcheckbox"
+                  aria-checked={guard}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    if (
+                      guard &&
+                      !confirm(
+                        'ปิด Guard? คำสั่งทุกอย่างของ Agent เช่น ลบไฟล์ หรือติดตั้งโปรแกรม จะรันทันทีโดยไม่ถาม (ยกเว้นการสั่งพิมพ์และการเพิ่ม skill)'
+                      )
+                    )
+                      return
+                    onGuard(!guard)
+                  }}
+                >
+                  {shieldIcon(guard)}
+                  Guard: {guard ? 'เปิด' : 'ปิด'}
                 </button>
                 <button
                   role="menuitem"

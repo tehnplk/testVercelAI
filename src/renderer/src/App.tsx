@@ -28,7 +28,8 @@ const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
 const JEV_TEXT: Record<JevStatus, string> = {
   inspecting: 'กำลังวิเคราะห์',
   safe: 'ปลอดภัย',
-  risk: 'มีความเสี่ยง'
+  risk: 'มีความเสี่ยง',
+  off: 'ปิด รันโดยไม่ถาม'
 }
 
 const ATTACH_HEAD = 'ไฟล์แนบ:\n'
@@ -206,6 +207,8 @@ function App(): React.JSX.Element {
   // Model picked for a chat not sent yet; null for the default. Stored on the session its first message creates.
   const [newModel, setNewModel] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
+  // Guard on/off; the main process keeps the setting and applies it.
+  const [guard, setGuard] = useState(true)
   const bottom = useRef<HTMLDivElement>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const opening = useRef<number | null>(null)
@@ -255,8 +258,14 @@ function App(): React.JSX.Element {
     setSessions((list) => list.map((s) => (s.id === sessionId ? { ...s, model: id } : s)))
   }
 
+  const toggleGuard = async (on: boolean): Promise<void> => {
+    await window.api.setGuard(on)
+    setGuard(on)
+  }
+
   useEffect(() => {
     window.api.models().then(setModels)
+    window.api.guard().then(setGuard)
     window.api.sessions().then((list) => {
       setSessions(list)
       if (list[0]) openSession(list[0].id)
@@ -350,6 +359,8 @@ function App(): React.JSX.Element {
           onClear={clearSessions}
           onRename={renameSession}
           onPin={pinSession}
+          guard={guard}
+          onGuard={toggleGuard}
         />
         <div className="chat">
           <ChatHeader session={session} />
@@ -492,6 +503,11 @@ function App(): React.JSX.Element {
                 >
                   {modelLabel}
                 </button>
+                {!guard && (
+                  <span className="guard-off-badge" title="Guard ปิดอยู่: คำสั่งรันโดยไม่ถาม เปิดได้ที่เมนูโปรไฟล์">
+                    Guard ปิด
+                  </span>
+                )}
               </div>
             )}
           </form>

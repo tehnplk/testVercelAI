@@ -27,7 +27,8 @@ declare global {
     'agentInputTokens' | 'agentOutputTokens' | 'guardInputTokens' | 'guardOutputTokens'
   >
   type Risk ={ level: 'safe' | 'risk'; reason: string }
-  type JevStatus = 'inspecting' | Risk['level']
+  // off: Guard is turned off and the call ran without asking.
+  type JevStatus = 'inspecting' | Risk['level'] | 'off'
   // risk is null for tools that always ask without Guard (addSkill).
   type ApprovalRequest = { id: string; tool: string; detail: string; risk: Risk | null }
   type ToolEvent = { id: string; name: string; running: boolean; skill?: string; input?: string }
@@ -55,6 +56,9 @@ declare global {
       /** The agent's saved notes, newest first. */
       memories: () => Promise<Memory[]>
       deleteMemory: (id: number) => Promise<void>
+      /** Whether Guard checks commands; when off they run without asking, except printing and addSkill. */
+      guard: () => Promise<boolean>
+      setGuard: (on: boolean) => Promise<void>
       history: (sessionId: number) => Promise<ChatMessage[]>
       /** model (one of models()) is stored on a new session; an existing session uses its own. */
       send: (sessionId: number | null, content: string, model: string) => Promise<{ sessionId: number; text: string }>

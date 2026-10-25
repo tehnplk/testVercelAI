@@ -30,6 +30,10 @@ const printsRe = new RegExp(
   'i'
 )
 
+// RISK when the command may print; null otherwise. Used with Guard off too, so printing always asks.
+export const printRisk = (detail: string): Risk | null =>
+  printsRe.test(detail) ? { level: 'risk', reason: 'กฎในโค้ด: สั่งพิมพ์ออกเครื่องพิมพ์ ใช้กระดาษและย้อนกลับไม่ได้' } : null
+
 // Deterministic pre-check: a Bash command made only of read-only bsk commands and sleep is SAFE without a
 // model. Anything it does not recognise goes to the models as before.
 
@@ -299,8 +303,8 @@ export async function assessRisk(
   earlier: string[]
 ): Promise<{ risk: Risk; usage: Pick<LanguageModelUsage, 'inputTokens' | 'outputTokens'> }> {
   const usage: Tokens = { inputTokens: 0, outputTokens: 0 }
-  if (printsRe.test(detail))
-    return { risk: { level: 'risk', reason: 'กฎในโค้ด: สั่งพิมพ์ออกเครื่องพิมพ์ ใช้กระดาษและย้อนกลับไม่ได้' }, usage }
+  const print = printRisk(detail)
+  if (print) return { risk: print, usage }
   // A Bash detail is "<cwd>\n$ <command>".
   const at = detail.indexOf('\n$ ')
   if (tool === 'Bash' && at >= 0 && (await bskChainSafe(detail.slice(at + 3))))
