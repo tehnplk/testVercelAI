@@ -37,6 +37,14 @@ function skillName(toolCall: { toolName: string; input: unknown }): string | und
   return toolCall.toolName === 'loadSkill' && typeof name === 'string' ? name : undefined
 }
 
+// Model calls per message. The last one gets no tools and lastStepNote, so a reply always ends in an answer.
+const maxSteps = 20
+const lastStepNote = `
+
+This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).`
+// Saved and shown when the run still ends without text.
+const noAnswer = 'ขออภัย รอบนี้โมเดลไม่ได้เขียนคำตอบ ลองส่งข้อความให้ทำต่อ หรือแบ่งงานให้เล็กลง'
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -239,9 +247,10 @@ app.whenReady().then(() => {
     // Read on every message, so a skill folder added while the app runs is picked up, and notes saved in
     // another chat are known.
     const skills = discoverSkills()
+    const system = systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories())
     const result = streamText({
       model: agentModel(modelId),
-      system: systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories()),
+      system,
       tools: {
         // The summary model's tokens count as the agent's.
         ...shellTools(approve, toolOutput, content, (u) =>
@@ -253,7 +262,9 @@ app.whenReady().then(() => {
         // Web search fees are not tokens; only the tokens of its model and webFetch's helper are counted.
         ...webTools((u) => countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens }))
       },
-      stopWhen: isStepCount(20),
+      stopWhen: isStepCount(maxSteps),
+      prepareStep: ({ stepNumber }) =>
+        stepNumber === maxSteps - 1 ? { toolChoice: 'none', instructions: system + lastStepNote } : undefined,
       messages,
       onToolExecutionStart: ({ toolCall }) =>
         event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall) }),
@@ -268,8 +279,15 @@ app.whenReady().then(() => {
       if (part.type === 'text-delta') event.sender.send('chat:text', { delta: part.text })
       else if (part.type === 'error') throw part.error
     }
-    await saveMessages(id, await result.responseMessages)
-    return { sessionId: id, text: await result.text }
+    const response = await result.responseMessages
+    // An empty last step (the model wrote nothing) still leaves an answer in the chat.
+    let text = await result.text
+    if (!text.trim()) {
+      text = noAnswer
+      response.push({ role: 'assistant', content: text })
+    }
+    await saveMessages(id, response)
+    return { sessionId: id, text }
   })
 
   createWindow()
