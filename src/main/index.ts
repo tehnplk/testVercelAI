@@ -14,8 +14,10 @@ import { imageTools, splitAttachments, withAttachedImages } from './llm_image'
 import { fetchImage, webTools } from './llm_web'
 import { memoryPrompt, recallTools } from './llm_recall'
 import { randomUUID } from 'crypto'
+import { userInfo } from 'os'
 import {
   addUsage,
+  clearSessions,
   deleteMemory,
   deleteSession,
   listMemories,
@@ -104,6 +106,8 @@ app.whenReady().then(() => {
     if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
     return deleteSession(sessionId as number)
   })
+  ipcMain.handle('sessions:clear', () => clearSessions())
+  ipcMain.handle('user:name', () => userInfo().username)
   ipcMain.handle('sessions:rename', (_, sessionId: unknown, title: unknown) => {
     if (!Number.isInteger(sessionId)) throw new Error('Invalid session')
     const t = typeof title === 'string' ? title.trim() : ''

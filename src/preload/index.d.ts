@@ -41,6 +41,10 @@ declare global {
     api: {
       sessions: () => Promise<Session[]>
       deleteSession: (sessionId: number) => Promise<void>
+      /** Deletes every chat and its messages; memories stay. */
+      clearSessions: () => Promise<void>
+      /** The Windows user name. */
+      userName: () => Promise<string>
       /** The title is trimmed and must be 1 to 200 characters. */
       renameSession: (sessionId: number, title: string) => Promise<void>
       pinSession: (sessionId: number, pinned: boolean) => Promise<void>

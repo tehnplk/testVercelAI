@@ -227,6 +227,12 @@ function App(): React.JSX.Element {
     if (id === sessionId) openSession(null)
   }
 
+  const clearSessions = async (): Promise<void> => {
+    await window.api.clearSessions()
+    setSessions([])
+    openSession(null)
+  }
+
   const renameSession = async (id: number, title: string): Promise<void> => {
     await window.api.renameSession(id, title)
     setSessions((list) => list.map((s) => (s.id === id ? { ...s, title } : s)))
@@ -340,6 +346,7 @@ function App(): React.JSX.Element {
           disabled={pending}
           onOpen={openSession}
           onDelete={deleteSession}
+          onClear={clearSessions}
           onRename={renameSession}
           onPin={pinSession}
         />

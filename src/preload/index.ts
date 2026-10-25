@@ -5,6 +5,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   sessions: () => ipcRenderer.invoke('sessions:list'),
   deleteSession: (sessionId: number) => ipcRenderer.invoke('sessions:delete', sessionId),
+  clearSessions: () => ipcRenderer.invoke('sessions:clear'),
+  userName: () => ipcRenderer.invoke('user:name'),
   renameSession: (sessionId: number, title: string) => ipcRenderer.invoke('sessions:rename', sessionId, title),
   pinSession: (sessionId: number, pinned: boolean) => ipcRenderer.invoke('sessions:pin', sessionId, pinned),
   setSessionModel: (sessionId: number, model: string) => ipcRenderer.invoke('sessions:set-model', sessionId, model),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import MemoryList from './MemoryList'
 
 const MIN_WIDTH = 180
@@ -84,16 +84,43 @@ type Props = {
   disabled: boolean
   onOpen: (id: number | null) => void
   onDelete: (id: number) => void
+  onClear: () => void
   onRename: (id: number, title: string) => void
   onPin: (id: number, pinned: boolean) => void
 }
 
-function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, onPin }: Props): React.JSX.Element {
+function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onClear, onRename, onPin }: Props): React.JSX.Element {
   const [layout, setLayout] = useState(loadLayout)
   const [dragging, setDragging] = useState(false)
   const [query, setQuery] = useState('')
   const [renaming, setRenaming] = useState<number | null>(null)
   const [showMemory, setShowMemory] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [userName, setUserName] = useState('')
+  const profile = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    window.api.userName().then(setUserName)
+  }, [])
+
+  // Closes on a click outside the profile row or on Esc (focus goes back to the profile button).
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent): void => {
+      if (!profile.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      setMenuOpen(false)
+      profile.current?.querySelector<HTMLElement>('.profile-button')?.focus()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   // Sessions arrive newest first and pinned ones go first, so groups fill in display order
   // (pinned, then by date) and empty ones never appear.
@@ -234,10 +261,44 @@ function Sidebar({ sessions, sessionId, disabled, onOpen, onDelete, onRename, on
             ))}
             {q && groups.size === 0 && <div className="sessions-empty">ไม่พบแชต</div>}
           </nav>
-          {/* Same look as + แชตใหม่; open while a reply runs too, since that reply's prompt is already built. */}
-          <button className="new-session" onClick={() => setShowMemory(true)}>
-            ความจำ
-          </button>
+          <div className="profile" ref={profile}>
+            {menuOpen && (
+              <div className="profile-menu" role="menu">
+                {/* Open while a reply runs too, since that reply's prompt is already built. */}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setShowMemory(true)
+                  }}
+                >
+                  ความจำ
+                </button>
+                <button
+                  role="menuitem"
+                  className="profile-clear"
+                  disabled={disabled || sessions.length === 0}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    if (confirm(`ล้างประวัติแชตทั้งหมด ${sessions.length} แชต? การลบนี้ย้อนกลับไม่ได้`)) onClear()
+                  }}
+                >
+                  ล้างประวัติแชต
+                </button>
+              </div>
+            )}
+            <button
+              className="profile-button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+            >
+              <span className="profile-avatar" aria-hidden="true">
+                {userName.charAt(0).toUpperCase()}
+              </span>
+              <span className="profile-name">{userName}</span>
+            </button>
+          </div>
         </div>
       </aside>
       {showMemory && <MemoryList onClose={() => setShowMemory(false)} />}

@@ -172,6 +172,15 @@ export async function deleteSession(sessionId: number): Promise<void> {
   })
 }
 
+// Every chat and its messages in one transaction; memories stay.
+export async function clearSessions(): Promise<void> {
+  await ready
+  await db.transaction(async (tx) => {
+    await tx.query('DELETE FROM messages')
+    await tx.query('DELETE FROM sessions')
+  })
+}
+
 // Newest first.
 export async function listMemories(): Promise<Memory[]> {
   await ready
