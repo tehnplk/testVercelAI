@@ -44,10 +44,11 @@ function toolPurpose(toolCall: { input: unknown }): string | undefined {
 }
 
 // Model calls per message. The last one gets no tools and lastStepNote, so a reply always ends in an answer.
+// The note goes in as a user message after the last tool result: in the system prompt, Claude Haiku and
+// DeepSeek ignore it after many tool calls and end the turn with empty text.
 const maxSteps = 20
-const lastStepNote = `
-
-This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).`
+const lastStepNote =
+  'This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).'
 // Saved and shown when the run still ends without text.
 const noAnswer = 'ขออภัย รอบนี้โมเดลไม่ได้เขียนคำตอบ ลองส่งข้อความให้ทำต่อ หรือแบ่งงานให้เล็กลง'
 
@@ -269,8 +270,11 @@ app.whenReady().then(() => {
         ...webTools((u) => countUsage({ agentInput: u.inputTokens, agentOutput: u.outputTokens }))
       },
       stopWhen: isStepCount(maxSteps),
-      prepareStep: ({ stepNumber }) =>
-        stepNumber === maxSteps - 1 ? { toolChoice: 'none', instructions: system + lastStepNote } : undefined,
+      // The note is sent for this call only; it is not part of the response messages that get saved.
+      prepareStep: ({ stepNumber, messages }) =>
+        stepNumber === maxSteps - 1
+          ? { toolChoice: 'none', messages: [...messages, { role: 'user', content: lastStepNote }] }
+          : undefined,
       messages,
       onToolExecutionStart: ({ toolCall }) =>
         event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: true, skill: skillName(toolCall), input: toolPurpose(toolCall) }),
