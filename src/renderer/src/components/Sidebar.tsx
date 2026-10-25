@@ -308,15 +308,8 @@ function Sidebar({
                   {memoryIcon}
                   ความจำ
                 </button>
-                {/* Toggles at once both ways; the red "Guard ปิด" badge under the chat box is the reminder. */}
-                <button
-                  role="menuitemcheckbox"
-                  aria-checked={guard}
-                  onClick={() => {
-                    setMenuOpen(false)
-                    onGuard(!guard)
-                  }}
-                >
+                {/* Toggles at once both ways and keeps the menu open so the switch visibly moves; the red "Guard ปิด" badge under the chat box is the reminder. */}
+                <button role="menuitemcheckbox" aria-checked={guard} onClick={() => onGuard(!guard)}>
                   {shieldIcon(guard)}
                   Guard
                   <span className="switch" aria-hidden="true" />
