@@ -26,6 +26,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "ai": "^7.0.150",
+    "chart.js": "4.5.1",
     "docx-preview": "0.4.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown, { defaultUrlTransform, type ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
 import DocxViewer from './components/DocxViewer'
 import FileLink, { linkifyPaths, OPEN, ViewDocx } from './components/FileLink'
+import MarkdownImage from './components/MarkdownImage'
 import ModelPicker from './components/ModelPicker'
 import Sidebar, { displayTitle } from './components/Sidebar'
+
+const components = { pre: CodeBlock, a: FileLink, img: MarkdownImage }
+
+// While an answer streams, a ```chart block whose JSON is not complete yet shows as code, without an error.
+function LiveCodeBlock(props: React.ComponentProps<'pre'> & ExtraProps): React.JSX.Element {
+  return <CodeBlock {...props} live />
+}
+const liveComponents = { ...components, pre: LiveCodeBlock }
+
+// Image sources stay as written (local Windows paths too): MarkdownImage loads them only through image:load.
+const urlTransform = (url: string, key: string): string => (key === 'src' ? url : defaultUrlTransform(url))
 
 const count = (n: number | null): string => (n ?? 0).toLocaleString('th-TH')
 
@@ -306,7 +318,7 @@ function App(): React.JSX.Element {
                 {m.role === 'assistant' ? (
                   <>
                     {m.turn && <TurnInfo turn={m.turn} />}
-                    <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                    <Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>
                       {linkifyPaths(m.content)}
                     </Markdown>
                   </>
@@ -331,7 +343,7 @@ function App(): React.JSX.Element {
                   </div>
                 ))}
                 {streamed && (
-                  <Markdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock, a: FileLink }}>
+                  <Markdown remarkPlugins={[remarkGfm]} components={liveComponents} urlTransform={urlTransform}>
                     {linkifyPaths(streamed)}
                   </Markdown>
                 )}

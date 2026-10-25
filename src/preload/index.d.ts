@@ -56,6 +56,12 @@ declare global {
       openPath: (path: string) => Promise<string>
       /** Bytes of a .docx file, or an error message when it is missing or over 50 MB. Rejects other paths. */
       readDocx: (path: string) => Promise<Uint8Array | string>
+      /**
+       * An answer's image as a data: URL. src is an http(s) URL or a full Windows path (optionally file:///,
+       * percent-encoded as react-markdown gives it); local files must be png/jpg/gif/webp/bmp/svg up to 20 MB,
+       * web images image/* up to 10 MB from a public address.
+       */
+      loadImage: (src: string) => Promise<{ src: string } | { error: string }>
       /** Full paths chosen in the file dialog; empty when canceled. */
       pickFiles: () => Promise<string[]>
       onJev: (cb: (update: { id: string; status: JevStatus }) => void) => () => void

@@ -12,10 +12,11 @@ const pathRe = /[A-Za-z]:[\\/](?:[^\\/:*?"<>|\r\n`]+[\\/])*[^\\/:*?"<>|\r\n`]+\.
 
 const toLink = (path: string): string => `[\`${path}\`](${OPEN}${encodeURIComponent(path)})`
 
-// Turns Windows file paths in markdown into links, leaving fenced code blocks alone.
+// Turns Windows file paths in markdown into links, leaving fenced code blocks and images (![alt](path) or
+// ![alt](<path>)) alone.
 export function linkifyPaths(markdown: string): string {
   return markdown
-    .split(/(```[\s\S]*?```)/)
+    .split(/(```[\s\S]*?```|!\[[^\]\n]*\]\((?:<[^>\n]*>|[^)\n]*)[^)\n]*\))/)
     .map((part, i) =>
       i % 2
         ? part
