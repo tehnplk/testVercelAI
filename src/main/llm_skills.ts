@@ -79,9 +79,9 @@ ${skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`
 }
 
 // Limits for addSkill: the download, the unpacked repo (against gzip bombs), and the installed skill.
-const maxDownload = 20 * 1024 * 1024
+const maxDownload = 50 * 1024 * 1024
 const maxUnpacked = 100 * 1024 * 1024
-const maxSkillBytes = 20 * 1024 * 1024
+const maxSkillBytes = 50 * 1024 * 1024
 const maxSkillFiles = 500
 
 // https://github.com/<owner>/<repo>[/tree/<ref>/<path>], matched on the raw text so no URL parser resolves "..".
