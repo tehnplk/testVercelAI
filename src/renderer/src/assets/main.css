@@ -1,5 +1,15 @@
 @import './base.css';
 
+:root {
+  color-scheme: dark;
+}
+
+/* One thin dark scrollbar everywhere; scrollbar-color has no hover state, so the thumb stays #3e4452. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3e4452 transparent;
+}
+
 body {
   font-size: 12px;
 }
@@ -100,8 +110,6 @@ body {
   overflow-y: auto;
   margin-right: -8px;
   padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ev-c-gray-1) transparent;
 }
 
 .sessions section {
@@ -587,8 +595,6 @@ body {
   overflow-x: auto;
   border-collapse: collapse;
   overflow-wrap: normal;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ev-c-gray-1) transparent;
 }
 
 .msg.assistant th,
