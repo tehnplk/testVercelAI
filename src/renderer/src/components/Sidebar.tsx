@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Check, Pencil, Pin, Puzzle, Shield, ShieldOff, Trash, Trash2 } from 'lucide-react'
+import { Bookmark, Check, Moon, Pencil, Pin, Puzzle, Shield, ShieldOff, Sun, SunMoon, Trash, Trash2 } from 'lucide-react'
 import MemoryList from './MemoryList'
 import SkillList from './SkillList'
 
@@ -72,6 +72,11 @@ const skillsIcon = <Puzzle size={16} strokeWidth={1.75} aria-hidden="true" />
 
 const clearIcon = <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
 
+const themeIcon = <SunMoon size={16} strokeWidth={1.75} aria-hidden="true" />
+
+// Read once in main.tsx, before the first render.
+export const THEME_KEY = 'theme'
+
 type Props = {
   sessions: Session[]
   sessionId: number | null
@@ -105,7 +110,19 @@ function Sidebar({
   const [showSkills, setShowSkills] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [userName, setUserName] = useState('')
+  const [dark, setDark] = useState(() => document.documentElement.dataset.theme !== 'light')
   const profile = useRef<HTMLDivElement>(null)
+
+  const toggleTheme = (): void => {
+    const theme = dark ? 'light' : 'dark'
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem(THEME_KEY, theme)
+    } catch {
+      // storage unavailable; the theme just isn't remembered
+    }
+    setDark(!dark)
+  }
 
   useEffect(() => {
     window.api.userName().then(setUserName)
@@ -272,6 +289,15 @@ function Sidebar({
           <div className="profile" ref={profile}>
             {menuOpen && (
               <div className="profile-menu" role="menu">
+                {/* Like Guard: toggles at once and keeps the menu open. Checked = dark. */}
+                <button role="menuitemcheckbox" aria-checked={dark} aria-label="ธีมมืด" onClick={toggleTheme}>
+                  {themeIcon}
+                  ธีม
+                  <span className="theme-switch" aria-hidden="true">
+                    <Sun className="theme-sun" size={12} strokeWidth={2} />
+                    <Moon className="theme-moon" size={12} strokeWidth={2} />
+                  </span>
+                </button>
                 {/* Open while a reply runs too, since that reply's prompt is already built. */}
                 <button
                   role="menuitem"

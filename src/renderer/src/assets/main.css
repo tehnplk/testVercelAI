@@ -4,7 +4,11 @@
   color-scheme: dark;
 }
 
-/* One thin dark scrollbar everywhere. Do not add scrollbar-width/scrollbar-color: Chromium then ignores these pseudo-elements. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* One thin scrollbar everywhere, in the theme's colors. Do not add scrollbar-width/scrollbar-color: Chromium then ignores these pseudo-elements. */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -16,14 +20,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3e4452;
+  background: var(--scrollbar-thumb);
   background-clip: padding-box;
   border: 1px solid transparent;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5263;
+  background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 
@@ -236,7 +240,7 @@ body {
 }
 
 .session-actions .session-delete:hover:not(:disabled) {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 /* Rename mode: the input fills the row and the check button sits at its right end. */
@@ -264,7 +268,7 @@ body {
 }
 
 .session-save:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -274,7 +278,7 @@ body {
   min-width: 0;
   min-height: 34px;
   padding: 7px 9px;
-  border: 1px solid #2f6fed;
+  border: 1px solid var(--accent);
   border-radius: 8px;
   outline: none;
   background: var(--color-background);
@@ -289,7 +293,7 @@ body {
 }
 
 .session.active {
-  background: rgba(47, 111, 237, 0.25);
+  background: var(--accent-tint);
   color: var(--color-text);
 }
 
@@ -308,7 +312,7 @@ body {
 .session-search:focus-visible,
 .session-open:focus-visible,
 .session-actions button:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -354,7 +358,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #2f6fed;
+  background: var(--accent);
   color: #fff;
   font-weight: 600;
 }
@@ -427,22 +431,64 @@ body {
 }
 
 [aria-checked='true'] > .switch {
-  background: #2f6fed;
+  background: var(--accent);
 }
 
 [aria-checked='true'] > .switch::after {
   transform: translateX(16px);
 }
 
+/* Theme switch: sun at the left end, moon at the right; the knob slides under the active one, which turns dark. */
+.theme-switch {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 40px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: var(--ev-c-gray-2);
+  color: var(--ev-c-text-2);
+}
+
+.theme-switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 150ms ease;
+}
+
+.theme-switch svg {
+  position: relative;
+}
+
+[aria-checked='true'] > .theme-switch::before {
+  transform: translateX(20px);
+}
+
+[aria-checked='false'] > .theme-switch .theme-sun,
+[aria-checked='true'] > .theme-switch .theme-moon {
+  color: #383a42;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .switch,
-  .switch::after {
+  .switch::after,
+  .theme-switch::before {
     transition: none;
   }
 }
 
 .profile-menu .profile-clear:hover:not(:disabled) {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .profile-menu button:disabled {
@@ -452,7 +498,7 @@ body {
 
 .profile-button:focus-visible,
 .profile-menu button:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -508,9 +554,9 @@ body {
 }
 
 .msg.user {
-  border: 1px solid #3e4452;
-  background: #1d1f23;
-  color: #abb2bf;
+  border: 1px solid var(--ev-c-gray-2);
+  background: var(--color-background-soft);
+  color: var(--color-text);
 }
 
 .msg.user::selection,
@@ -519,7 +565,7 @@ body {
 }
 
 .msg.assistant {
-  border: 1px solid #3e4452;
+  border: 1px solid var(--ev-c-gray-2);
   background: var(--color-background-mute);
   white-space: normal;
 }
@@ -564,9 +610,9 @@ body {
 /* Links in messages: calm, no browser blue; the underline brightens on hover. */
 .msg a,
 .msg a:visited {
-  color: var(--ev-c-white-soft);
+  color: var(--link);
   text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-decoration-color: var(--link-underline);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
@@ -650,7 +696,7 @@ body {
 
 .chart-error {
   margin-top: 4px;
-  color: #ff6b6b;
+  color: var(--error);
   font-size: 11px;
 }
 
@@ -673,7 +719,7 @@ body {
 }
 
 .md-image:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -708,7 +754,7 @@ body {
 
 .md-image-status.error {
   border-color: rgba(255, 107, 107, 0.5);
-  color: #ff6b6b;
+  color: var(--error);
 }
 
 .image-viewer {
@@ -748,7 +794,7 @@ body {
 }
 
 .image-viewer-close:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
 }
 
 .msg.pending {
@@ -776,7 +822,7 @@ body {
 
 .jev-risk,
 .jev-off {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .tool-output {
@@ -786,8 +832,8 @@ body {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--ev-c-gray-2);
-  background: #1d1f23;
-  color: #abb2bf;
+  background: var(--color-background-soft);
+  color: var(--color-text);
   font-family: Consolas, ui-monospace, monospace;
   font-size: 1em;
   white-space: pre-wrap;
@@ -854,7 +900,7 @@ body {
 
 .turn summary:focus-visible,
 .tool-result summary:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -908,14 +954,14 @@ body {
 }
 
 .approval-actions .run {
-  border-color: #2f6fed;
-  background: #2f6fed;
+  border-color: var(--accent);
+  background: var(--accent);
   color: #fff;
 }
 
 .error {
   align-self: center;
-  color: #ff6b6b;
+  color: var(--error);
 }
 
 /* .docx viewer: a dark frame around docx-preview's white pages; only its body scrolls. */
@@ -982,7 +1028,7 @@ body {
 }
 
 .docx-viewer-header button:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -1004,7 +1050,7 @@ body {
 }
 
 .docx-viewer-status.error {
-  color: #ff6b6b;
+  color: var(--error);
 }
 
 /* docx-preview's wrapper, with the app's background and less padding so an A4 page fits a 900px window. */
@@ -1038,7 +1084,7 @@ body {
 }
 
 .composer-box:focus-within {
-  border-color: #2f6fed;
+  border-color: var(--accent);
 }
 
 .composer-row {
@@ -1073,9 +1119,9 @@ body {
 }
 
 .msg.user .file-chip {
-  border-color: #3e4452;
-  background: #282c34;
-  color: #abb2bf;
+  border-color: var(--ev-c-gray-2);
+  background: var(--color-background-mute);
+  color: var(--color-text);
 }
 
 .file-chip-name {
@@ -1094,11 +1140,11 @@ body {
 }
 
 .composer .file-chip button:hover:not(:disabled) {
-  color: #ff6b6b;
+  color: var(--error);
 }
 
 .composer .file-chip button:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
 }
 
 .composer textarea {
@@ -1132,14 +1178,14 @@ body {
 }
 
 .composer .attach:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
 }
 
 .composer button {
   padding: 0 20px;
   border: none;
   border-radius: 10px;
-  background: #2f6fed;
+  background: var(--accent);
   color: #fff;
   font: inherit;
   cursor: pointer;
@@ -1170,7 +1216,7 @@ body {
 }
 
 .composer .model-badge:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
 }
 
 .guard-badge {
@@ -1192,8 +1238,8 @@ body {
 }
 
 .guard-badge.off {
-  border-color: #ef5350;
-  color: #ef5350;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* Model picker: a small dialog with the same frame as the .docx viewer. */
@@ -1286,12 +1332,12 @@ body {
 }
 
 .model-option.current {
-  background: rgba(47, 111, 237, 0.25);
+  background: var(--accent-tint);
 }
 
 .model-picker-close:focus-visible,
 .model-option:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -1355,10 +1401,10 @@ body {
   margin-top: 2px;
   border: none;
   background: transparent;
-  color: var(--ev-c-white-soft);
+  color: var(--link);
   font-size: 12px;
   text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-decoration-color: var(--link-underline);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -1369,7 +1415,7 @@ body {
 }
 
 .skill-open:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1386,10 +1432,51 @@ body {
 
 .memory-delete:hover {
   background: var(--color-background);
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .memory-delete:focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+/* Light theme: colors set once above rather than through the palette variables. */
+:root[data-theme='light'] .profile {
+  border-top-color: var(--ev-c-gray-2);
+  box-shadow: 0 -6px 12px -6px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme='light'] .msg.user::selection,
+:root[data-theme='light'] .msg.user *::selection {
+  background: rgba(74, 111, 165, 0.25);
+}
+
+:root[data-theme='light'] .msg.assistant tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme='light'] .msg.assistant tbody tr:hover {
+  background: rgba(74, 111, 165, 0.1);
+}
+
+:root[data-theme='light'] .jev-safe {
+  color: #26692a;
+}
+
+:root[data-theme='light'] .guard-badge.on {
+  border-color: rgba(38, 105, 42, 0.4);
+  background: rgba(38, 105, 42, 0.08);
+  color: #26692a;
+}
+
+:root[data-theme='light'] .approval {
+  border-color: #b8860b;
+}
+
+:root[data-theme='light'] .model-option-check {
+  color: var(--accent);
+}
+
+:root[data-theme='light'] .skill-name {
+  color: var(--color-text);
 }

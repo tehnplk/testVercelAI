@@ -22,6 +22,40 @@
   --ev-button-alt-hover-border: transparent;
   --ev-button-alt-hover-text: var(--ev-c-text-1);
   --ev-button-alt-hover-bg: var(--ev-c-gray-2);
+
+  --accent: #2f6fed;
+  --accent-tint: rgba(47, 111, 237, 0.25);
+  --danger: #ef5350;
+  --error: #ff6b6b;
+  --link: var(--ev-c-white-soft);
+  --link-underline: rgba(255, 255, 255, 0.35);
+  --scrollbar-thumb: #3e4452;
+  --scrollbar-thumb-hover: #4b5263;
+}
+
+/* Light theme (<html data-theme="light">): the same structure on soft off-white; text colors reach AA (4.5:1)
+   on the page and on the answer bubble, except text-3, which stays decorative like the dark one. */
+:root[data-theme='light'] {
+  --ev-c-black: #fafaf9;
+  --ev-c-black-soft: #f0f0ed;
+  --ev-c-black-mute: #e9e9e5;
+
+  --ev-c-gray-1: #a3a7ae;
+  --ev-c-gray-2: #d3d3ce;
+  --ev-c-gray-3: #e3e3df;
+
+  --ev-c-text-1: #383a42;
+  --ev-c-text-2: #5c6370;
+  --ev-c-text-3: #8a8f98;
+
+  --accent: #4a6fa5;
+  --accent-tint: rgba(74, 111, 165, 0.16);
+  --danger: #c62828;
+  --error: #c62828;
+  --link: #3d5a80;
+  --link-underline: rgba(61, 90, 128, 0.4);
+  --scrollbar-thumb: #c8c8c3;
+  --scrollbar-thumb-hover: #aeaea8;
 }
 
 :root {

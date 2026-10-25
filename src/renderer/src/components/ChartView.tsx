@@ -5,9 +5,18 @@ import { Chart, type ChartConfiguration } from 'chart.js/auto'
 function ChartView({ config }: { config: ChartConfiguration }): React.JSX.Element {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
+  // The chart is redrawn when the theme switches, since its colors are read from CSS once per draw.
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme)
 
   useEffect(() => {
-    // Labels and grid lines in the app's dark theme colors and font. Grid colors are set on the scales, not as
+    const html = document.documentElement
+    const observer = new MutationObserver(() => setTheme(html.dataset.theme))
+    observer.observe(html, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    // Labels and grid lines in the app's theme colors and font. Grid colors are set on the scales, not as
     // Chart.defaults.borderColor, which would stop Chart.js's Colors plugin from coloring the data.
     const css = getComputedStyle(document.documentElement)
     const grid = css.getPropertyValue('--ev-c-gray-2')
@@ -28,7 +37,7 @@ function ChartView({ config }: { config: ChartConfiguration }): React.JSX.Elemen
       setError(e instanceof Error ? e.message : String(e))
     }
     return () => chart?.destroy()
-  }, [config])
+  }, [config, theme])
 
   return (
     <div className="chart">
