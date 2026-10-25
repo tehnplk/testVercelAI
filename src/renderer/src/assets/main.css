@@ -471,7 +471,7 @@ body {
 }
 
 .msg {
-  max-width: 90%;
+  width: 100%;
   padding: 10px 14px;
   border-radius: 14px;
   white-space: pre-wrap;
@@ -479,7 +479,6 @@ body {
 }
 
 .msg.user {
-  align-self: flex-end;
   border: 1px solid #3e4452;
   background: #1d1f23;
   color: #abb2bf;
@@ -491,7 +490,6 @@ body {
 }
 
 .msg.assistant {
-  align-self: flex-start;
   border: 1px solid #3e4452;
   background: var(--color-background-mute);
   white-space: normal;
