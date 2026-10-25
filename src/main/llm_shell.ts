@@ -65,6 +65,40 @@ function ensureBskDaemon(): Promise<void> {
 
 app.on('will-quit', () => bskDaemon?.kill())
 
+// The url of the object in `v` whose id is tabId; the shape of bsk's JSON is not documented, so any depth.
+function findTabUrl(v: unknown, tabId: string): string | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const o = v as Record<string, unknown>
+  if (['id', 'tab_id', 'tabId'].some((k) => o[k] !== undefined && String(o[k]) === tabId) && typeof o.url === 'string')
+    return o.url
+  for (const x of Object.values(o)) {
+    const url = findTabUrl(x, tabId)
+    if (url) return url
+  }
+  return undefined
+}
+
+// A tab's URL from `bsk tab list`; undefined when bsk cannot tell. For the risk check of a bsk command only:
+// that check runs inside bskQueue, so this never overlaps another bsk command.
+export function bskTabUrl(session: string, tabId: string): Promise<string | undefined> {
+  const bsk = findBsk()
+  return new Promise((resolve) => {
+    if (!bsk) return resolve(undefined)
+    execFile(
+      bsk,
+      ['tab', 'list', '--session', session, '--json'],
+      { env: { ...process.env, BSK_AUTO_START: '0' }, windowsHide: true, timeout: 10_000 },
+      (e, out) => {
+        try {
+          resolve(e ? undefined : findTabUrl(JSON.parse(out), tabId))
+        } catch {
+          resolve(undefined)
+        }
+      }
+    )
+  })
+}
+
 type RunResult = { status: string; stdout: string; stderr: string }
 
 let bskQueue: Promise<unknown> = Promise.resolve()
@@ -163,15 +197,18 @@ export function shellTools(approve: Approve, onOutput: OnOutput, request: string
         { toolCallId }: { toolCallId: string }
       ) => {
         const dir = cwd ?? app.getPath('home')
-        if (!(await approve('Bash', `${dir}\n$ ${command}`, toolCallId)))
-          return 'The user denied this run. Do not retry it unless the user asks.'
         const isBsk = /\bbsk\b/.test(command)
-        if (isBsk) await ensureBskDaemon()
-        const go = (): Promise<RunResult> => run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
-        // bsk allows one command per session at a time, so parallel bsk calls in one step must queue (run never rejects).
+        const go = async (): Promise<RunResult | null> => {
+          if (isBsk) await ensureBskDaemon()
+          if (!(await approve('Bash', `${dir}\n$ ${command}`, toolCallId))) return null
+          return run(command, dir, timeoutSeconds ?? 120, (chunk) => onOutput(toolCallId, chunk))
+        }
+        // bsk allows one command per session at a time, so parallel bsk calls in one step must queue. The approval
+        // queues too: the risk check may read the tab's URL with bsk, and the tab must not change before the run.
         const next = isBsk ? bskQueue.then(go) : go()
-        if (isBsk) bskQueue = next
+        if (isBsk) bskQueue = next.catch(() => null)
         const result = await next
+        if (!result) return 'The user denied this run. Do not retry it unless the user asks.'
         // The chat shows a run's "Saved:"/"Result:" lines as its output; a run that printed none gets one
         // from the summary model, at the end of stdout where llm_memory.ts reads them.
         let stdout = tail(result.stdout)
