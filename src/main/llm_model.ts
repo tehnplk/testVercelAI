@@ -33,17 +33,24 @@ const retryCutStream: LanguageModelMiddleware = {
             const held: Part[] = []
             let live = false
             let cut = false
-            for await (const part of attempt.stream) {
-              if (part.type === 'error' && !live && retries > 0 && APICallError.isInstance(part.error) && part.error.isRetryable) {
-                cut = true
-                break
+            // The provider reports the cut as an error part; a stream that throws it is handled the same.
+            const retry = (e: unknown): boolean => !live && retries > 0 && APICallError.isInstance(e) && e.isRetryable
+            try {
+              for await (const part of attempt.stream) {
+                if (part.type === 'error' && retry(part.error)) {
+                  cut = true
+                  break
+                }
+                if (!live && part.type === 'text-delta') {
+                  live = true
+                  held.splice(0).forEach((p) => controller.enqueue(p))
+                }
+                if (live) controller.enqueue(part)
+                else held.push(part)
               }
-              if (!live && part.type === 'text-delta') {
-                live = true
-                held.splice(0).forEach((p) => controller.enqueue(p))
-              }
-              if (live) controller.enqueue(part)
-              else held.push(part)
+            } catch (e) {
+              if (!retry(e)) throw e
+              cut = true
             }
             if (!cut) {
               held.forEach((p) => controller.enqueue(p))
