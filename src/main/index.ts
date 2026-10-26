@@ -5,7 +5,7 @@ import { readFile, realpath, stat, writeFile } from 'fs/promises'
 import { Readable } from 'stream'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { isStepCount, streamText } from 'ai'
+import { isStepCount, streamText, type ModelMessage } from 'ai'
 import { agentModel, agentModels, isAgentModel } from './llm_model'
 import { systemPrompt } from './llm_system_prompt'
 import { shellTools } from './llm_shell'
@@ -46,6 +46,15 @@ function toolPurpose(toolCall: { input: unknown }): string | undefined {
   return typeof purpose === 'string' && purpose ? purpose : undefined
 }
 
+// An error with its causes and the response body, if any (cut), so a failed model call says why.
+function describeError(e: unknown): string {
+  const lines: string[] = []
+  for (let c = e; c instanceof Error && lines.length < 5; c = c.cause) lines.push(`${c.name}: ${c.message}`)
+  const body = (e as { responseBody?: unknown } | null)?.responseBody
+  if (typeof body === 'string' && body) lines.push(`response: ${body.slice(0, 1000)}`)
+  return lines.join('\n  cause: ') || String(e)
+}
+
 // Model calls per message. The last one gets no tools and lastStepNote, so a reply always ends in an answer.
 // The note goes in as a user message after the last tool result: in the system prompt, Claude Haiku and
 // DeepSeek ignore it after many tool calls and end the turn with empty text.
@@ -54,6 +63,8 @@ const lastStepNote =
   'This is your last step: tools are off now. Answer the user now, in Thai, from what you have: what you found, what is still missing or unchecked, and what the user can do next (e.g. ask you to continue).'
 // Saved and shown when the run still ends without text.
 const noAnswer = 'ขออภัย รอบนี้โมเดลไม่ได้เขียนคำตอบ ลองส่งข้อความให้ทำต่อ หรือแบ่งงานให้เล็กลง'
+// Saved after the steps that ended when a later step fails.
+const failedHalfway = 'รอบนี้หยุดกลางทางเพราะการเรียกโมเดลล้มเหลว งานในขั้นที่เสร็จแล้วยังอยู่ ส่งข้อความให้ทำต่อได้'
 
 function createWindow(): void {
   // Create the browser window.
@@ -340,6 +351,8 @@ app.whenReady().then(() => {
     // another chat are known.
     const skills = discoverSkills()
     const system = systemPrompt + skillsPrompt(skills) + memoryPrompt(await listMemories())
+    // Response messages of the steps that ended so far.
+    const done: ModelMessage[] = []
     const result = streamText({
       model: agentModel(modelId),
       system,
@@ -366,13 +379,24 @@ app.whenReady().then(() => {
       onToolExecutionEnd: ({ toolCall }) =>
         event.sender.send('chat:tool', { id: toolCall.toolCallId, name: toolCall.toolName, running: false, skill: skillName(toolCall), input: toolPurpose(toolCall) }),
       // Per step only; the all-steps total (result.usage) is not added again.
-      onStepEnd: ({ usage }) => countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
+      onStepEnd: ({ usage, response }) => {
+        done.push(...response.messages)
+        return countUsage({ agentInput: usage.inputTokens, agentOutput: usage.outputTokens })
+      }
     })
     // Text of every step goes to the pending bubble as it is written. streamText keeps going after an
     // error part (only logging it), so it is thrown here to fail the reply as generateText did.
-    for await (const part of result.stream) {
-      if (part.type === 'text-delta') event.sender.send('chat:text', { delta: part.text })
-      else if (part.type === 'error') throw part.error
+    try {
+      for await (const part of result.stream) {
+        if (part.type === 'text-delta') event.sender.send('chat:text', { delta: part.text })
+        else if (part.type === 'error') throw part.error
+      }
+    } catch (e) {
+      // The steps that ended are saved, so their work and context are not lost with the step that failed.
+      if (done.length) await saveMessages(id, [...done, { role: 'assistant', content: failedHalfway }])
+      const detail = describeError(e)
+      console.error(`chat:send failed (session ${id}, ${modelId}):\n${detail}`)
+      throw new Error(detail)
     }
     const response = await result.responseMessages
     // An empty last step (the model wrote nothing) still leaves an answer in the chat.
