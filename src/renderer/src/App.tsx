@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck, ShieldX } from 'lucide-react'
+import { Bot, ShieldCheck, ShieldX, User } from 'lucide-react'
 import Markdown, { defaultUrlTransform, type ExtraProps } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from './components/CodeBlock'
@@ -368,6 +368,9 @@ function App(): React.JSX.Element {
           <main className="messages">
             {messages.map((m, i) => (
               <div key={`${chatKey}-${i}`} className={`msg ${m.role}`}>
+                <span className="msg-role" aria-label={m.role === 'assistant' ? 'Agent' : 'User'} title={m.role === 'assistant' ? 'Agent' : 'User'}>
+                  {m.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
+                </span>
                 {m.role === 'assistant' ? (
                   <>
                     {m.turn && <TurnInfo turn={m.turn} />}
@@ -382,6 +385,9 @@ function App(): React.JSX.Element {
             ))}
             {pending && (
               <div className="msg assistant pending">
+                <span className="msg-role" aria-label="Agent" title="Agent">
+                  <Bot size={14} />
+                </span>
                 {liveSkills.length > 0 && (
                   <details className="turn">
                     <summary>

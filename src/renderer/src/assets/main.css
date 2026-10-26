@@ -547,10 +547,23 @@ body {
 
 .msg {
   width: 100%;
-  padding: 10px 14px;
+  position: relative;
+  padding: 28px 14px 10px;
   border-radius: 14px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.msg-role {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  display: flex;
+  color: var(--ev-c-text-2);
+}
+
+.msg.assistant > .msg-role + * {
+  margin-top: 0;
 }
 
 .msg.user {
