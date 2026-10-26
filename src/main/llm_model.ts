@@ -6,15 +6,16 @@ if (is.dev) process.loadEnvFile()
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })
 
 // Agent models the user picks per chat (ModelPicker.tsx); the first is the default, used when a chat stored none.
-// Prices are US$ per 1M tokens.
+// Prices are US$ per 1M tokens. The label is the id after the '/'.
 export const agentModels = [
-  { id: 'deepseek/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash', input: 0.15, output: 0.6 },
-  { id: 'z-ai/glm-5.3-flash', label: 'GLM 5.3 Flash', input: 0.15, output: 0.5 },
-  { id: 'openai/gpt-6-luna', label: 'GPT-6 Luna', input: 0.1, output: 0.5 },
-  { id: 'xiaomi/mimo-v2.6-flash', label: 'MiMo V2.6 Flash', input: 0.14, output: 0.28 },
-  { id: 'anthropic/claude-haiku-5.5', label: 'Claude Haiku 5.5', input: 0.1, output: 0.5 },
-  { id: 'meta/muse-spark-1.3-contributor', label: 'Muse Spark 1.3', input: 0.1, output: 0.2 }
-]
+  { id: 'deepseek/deepseek-v4.1-flash-1017', input: 0.15, output: 0.6 },
+  { id: 'z-ai/glm-5.3-flash', input: 0.15, output: 0.5 },
+  { id: 'openai/gpt-6-luna', input: 0.1, output: 0.5 },
+  { id: 'xiaomi/mimo-v2.6-flash', input: 0.14, output: 0.28 },
+  { id: 'anthropic/claude-haiku-5.5', input: 0.1, output: 0.5 },
+  { id: 'meta/muse-spark-1.3-contributor', input: 0.1, output: 0.2 },
+  { id: 'qwen/qwen3.8-flash', input: 0.15, output: 0.47 }
+].map((m) => ({ ...m, label: m.id.slice(m.id.indexOf('/') + 1) }))
 export const isAgentModel = (id: unknown): id is string => agentModels.some((m) => m.id === id)
 export const agentModel = (id: string | null): LanguageModel => openrouter(id ?? agentModels[0].id)
 
