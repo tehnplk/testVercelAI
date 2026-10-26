@@ -10,9 +10,14 @@ export const ViewDocx = createContext<(path: string) => void>(() => {})
 // ponytail: regex path detection; a path followed by more text with another ".ext" can over-match.
 const pathRe = /[A-Za-z]:[\\/](?:[^\\/:*?"<>|\r\n`]+[\\/])*[^\\/:*?"<>|\r\n`]+\.[A-Za-z0-9]{1,8}/g
 
-const toLink = (path: string): string => `[\`${path}\`](${OPEN}${encodeURIComponent(path)})`
+// A video file name; MarkdownImage plays these in a <video>.
+export const video = /\.(mp4|webm|mov|m4v)$/i
 
-// Turns Windows file paths in markdown into links, leaving fenced code blocks and images (![alt](path) or
+// A video path becomes an image (MarkdownImage plays it); any other path becomes a file link.
+const toLink = (path: string): string =>
+  video.test(path) ? `![](<${path}>)` : `[\`${path}\`](${OPEN}${encodeURIComponent(path)})`
+
+// Turns Windows file paths in markdown into links (video paths into images), leaving fenced code blocks and images (![alt](path) or
 // ![alt](<path>)) alone.
 export function linkifyPaths(markdown: string): string {
   return markdown

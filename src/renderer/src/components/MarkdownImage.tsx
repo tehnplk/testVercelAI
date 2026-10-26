@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ExtraProps } from 'react-markdown'
-import FileLink, { OPEN } from './FileLink'
+import FileLink, { OPEN, video } from './FileLink'
 
 // The full image in a modal <dialog>: Esc, the close button or a click anywhere closes it.
 function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }): React.JSX.Element {
@@ -51,10 +51,8 @@ function MarkdownVideo({ src, alt }: { src: string; alt: string }): React.JSX.El
   )
 }
 
-// Local video files only; a web URL ending in .mp4 still goes to image:load, which refuses it.
-const video = /\.(mp4|webm|mov|m4v)$/i
-
-// An answer's ![alt](src): a video file plays in a <video>; an image is loaded by the main process (image:load)
+// An answer's ![alt](src): a local video file plays in a <video> (a web URL ending in .mp4 still goes to
+// image:load, which refuses it); an image is loaded by the main process (image:load)
 // as a data: URL, so the raw src never reaches the DOM.
 function MarkdownImage({ src, alt = '' }: React.ComponentProps<'img'> & ExtraProps): React.JSX.Element {
   if (src && video.test(src) && !/^https?:\/\//i.test(src)) return <MarkdownVideo key={src} src={src} alt={alt} />
